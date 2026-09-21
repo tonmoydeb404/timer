@@ -9,21 +9,36 @@ import {
 } from "@packages/ui/components/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { appPaths } from "@/config/paths-config";
 import { useAuth } from "@/lib/auth-context";
+import { ensureUserSetup } from "@/lib/db";
 
 // Phase 1 overview: proves auth + layout. Analytics arrive in Phase 5,
 // projects/tasks management in Phase 2.
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const setupRan = useRef(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace(appPaths.login);
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (loading || !user || setupRan.current) return;
+    setupRan.current = true;
+    ensureUserSetup({
+      userId: user.$id,
+      name: user.name,
+      email: user.email,
+    }).catch((err) => {
+      setSetupError(err instanceof Error ? err.message : String(err));
+    });
+  }, [loading, user]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -40,6 +55,11 @@ export default function DashboardPage() {
         <p className="text-sm text-muted-foreground">
           Your time at a glance — start tracking from the desktop app.
         </p>
+        {setupError && (
+          <p className="text-sm text-destructive">
+            Couldn&apos;t finish account setup: {setupError}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

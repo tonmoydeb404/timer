@@ -106,6 +106,52 @@ pub async fn sign_out(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ---- Projects & tasks (live Appwrite reads/writes, no local mirror) ----
+
+#[tauri::command]
+pub async fn list_projects(app: AppHandle) -> Result<Vec<appwrite::Project>, String> {
+    let state = app.state::<AppState>();
+    let session = {
+        let conn = state.db.lock().map_err(map_err)?;
+        appwrite::require_session(&conn).map_err(map_err)?
+    };
+    appwrite::fetch_projects(&state.http, &session)
+        .await
+        .map_err(map_err)
+}
+
+#[tauri::command]
+pub async fn list_tasks(
+    app: AppHandle,
+    project_id: Option<String>,
+) -> Result<Vec<appwrite::Task>, String> {
+    let state = app.state::<AppState>();
+    let session = {
+        let conn = state.db.lock().map_err(map_err)?;
+        appwrite::require_session(&conn).map_err(map_err)?
+    };
+    appwrite::fetch_tasks(&state.http, &session, project_id.as_deref())
+        .await
+        .map_err(map_err)
+}
+
+/// Quick-add a task into an existing project (project CRUD stays on web).
+#[tauri::command]
+pub async fn create_task(
+    app: AppHandle,
+    project_id: String,
+    title: String,
+) -> Result<appwrite::Task, String> {
+    let state = app.state::<AppState>();
+    let session = {
+        let conn = state.db.lock().map_err(map_err)?;
+        appwrite::require_session(&conn).map_err(map_err)?
+    };
+    appwrite::insert_task(&state.http, &session, &project_id, &title)
+        .await
+        .map_err(map_err)
+}
+
 // ---- OAuth popup window (Rust-owned so no extra capabilities are needed) ----
 
 #[derive(Debug, serde::Serialize)]

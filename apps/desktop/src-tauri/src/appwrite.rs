@@ -282,3 +282,230 @@ pub fn clear_session(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error>
     )?;
     Ok(())
 }
+
+// ---- Generic row access (TablesDB rows API, user session) ----
+
+const DATABASE_ID: &str = "timer";
+
+pub const COLLECTION_PROJECTS: &str = "projects";
+pub const COLLECTION_TASKS: &str = "tasks";
+
+pub struct Session {
+    pub user_id: String,
+    pub secret: String,
+}
+
+pub fn require_session(conn: &rusqlite::Connection) -> Result<Session, AppwriteError> {
+    match load_session(conn) {
+        (Some(secret), Some(user_id)) => Ok(Session { user_id, secret }),
+        _ => Err(AppwriteError::Unauthorized),
+    }
+}
+
+/// Query helpers — serialized Appwrite `Query` objects (`queries[]` params).
+pub fn q_equal(attribute: &str, value: &str) -> serde_json::Value {
+    serde_json::json!({"method": "equal", "attribute": attribute, "values": [value]})
+}
+
+pub fn q_is_null(attribute: &str) -> serde_json::Value {
+    serde_json::json!({"method": "isNull", "attribute": attribute})
+}
+
+pub fn q_order_desc(attribute: &str) -> serde_json::Value {
+    serde_json::json!({"method": "orderDesc", "attribute": attribute})
+}
+
+pub fn q_limit(n: u32) -> serde_json::Value {
+    serde_json::json!({"method": "limit", "values": [n]})
+}
+
+pub async fn list_documents(
+    http: &reqwest::Client,
+    session: &Session,
+    collection: &str,
+    queries: &[serde_json::Value],
+) -> Result<Vec<serde_json::Value>, AppwriteError> {
+    let project = project_id().ok_or(AppwriteError::NotConfigured)?;
+    let url = format!(
+        "{}/tablesdb/{}/tables/{}/rows",
+        endpoint(),
+        DATABASE_ID,
+        collection
+    );
+    let params: Vec<(String, String)> = queries
+        .iter()
+        .map(|q| ("queries[]".to_string(), q.to_string()))
+        .collect();
+    let res = http
+        .get(&url)
+        .headers(headers(&project, Some(&session.secret)))
+        .query(&params)
+        .send()
+        .await?;
+    let status = res.status();
+    let body = res.text().await?;
+    if !status.is_success() {
+        return Err(status_error(status, &body));
+    }
+    let parsed: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| AppwriteError::Unexpected(e.to_string()))?;
+    parsed
+        .get("rows")
+        .and_then(|d| d.as_array())
+        .cloned()
+        .ok_or_else(|| AppwriteError::Unexpected("missing rows".to_string()))
+}
+
+pub async fn create_document(
+    http: &reqwest::Client,
+    session: &Session,
+    collection: &str,
+    data: serde_json::Value,
+) -> Result<serde_json::Value, AppwriteError> {
+    let project = project_id().ok_or(AppwriteError::NotConfigured)?;
+    let url = format!(
+        "{}/tablesdb/{}/tables/{}/rows",
+        endpoint(),
+        DATABASE_ID,
+        collection
+    );
+    let permissions = vec![
+        format!("read(\"user:{}\")", session.user_id),
+        format!("update(\"user:{}\")", session.user_id),
+        format!("delete(\"user:{}\")", session.user_id),
+    ];
+    let res = http
+        .post(&url)
+        .headers(headers(&project, Some(&session.secret)))
+        .json(&serde_json::json!({
+            "rowId": "unique()",
+            "data": data,
+            "permissions": permissions,
+        }))
+        .send()
+        .await?;
+    let status = res.status();
+    let body = res.text().await?;
+    if !status.is_success() {
+        return Err(status_error(status, &body));
+    }
+    serde_json::from_str(&body).map_err(|e| AppwriteError::Unexpected(e.to_string()))
+}
+
+// ---- Project / task shapes (mirror packages/domain, Appwrite raw form) ----
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    #[serde(rename = "$id")]
+    pub id: String,
+    #[serde(rename = "$createdAt")]
+    pub created_at: String,
+    #[serde(rename = "$updatedAt")]
+    pub updated_at: String,
+    #[serde(rename = "$permissions")]
+    pub permissions: Vec<String>,
+    #[serde(rename = "userId")]
+    pub user_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub status: String,
+    #[serde(rename = "deletedAt")]
+    pub deleted_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Task {
+    #[serde(rename = "$id")]
+    pub id: String,
+    #[serde(rename = "$createdAt")]
+    pub created_at: String,
+    #[serde(rename = "$updatedAt")]
+    pub updated_at: String,
+    #[serde(rename = "$permissions")]
+    pub permissions: Vec<String>,
+    #[serde(rename = "userId")]
+    pub user_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: String,
+    pub priority: String,
+    #[serde(rename = "dueDate")]
+    pub due_date: Option<String>,
+    #[serde(rename = "completedAt")]
+    pub completed_at: Option<String>,
+    #[serde(rename = "deletedAt")]
+    pub deleted_at: Option<String>,
+}
+
+fn parse_doc<T: for<'de> Deserialize<'de>>(value: serde_json::Value) -> Result<T, AppwriteError> {
+    serde_json::from_value(value).map_err(|e| AppwriteError::Unexpected(e.to_string()))
+}
+
+pub async fn fetch_projects(
+    http: &reqwest::Client,
+    session: &Session,
+) -> Result<Vec<Project>, AppwriteError> {
+    let docs = list_documents(
+        http,
+        session,
+        COLLECTION_PROJECTS,
+        &[
+            q_equal("userId", &session.user_id),
+            q_is_null("deletedAt"),
+            q_order_desc("$updatedAt"),
+            q_limit(100),
+        ],
+    )
+    .await?;
+    docs.into_iter().map(parse_doc).collect()
+}
+
+pub async fn fetch_tasks(
+    http: &reqwest::Client,
+    session: &Session,
+    project_id: Option<&str>,
+) -> Result<Vec<Task>, AppwriteError> {
+    let mut queries = vec![
+        q_equal("userId", &session.user_id),
+        q_is_null("deletedAt"),
+        q_order_desc("$updatedAt"),
+        q_limit(200),
+    ];
+    if let Some(pid) = project_id {
+        queries.push(q_equal("projectId", pid));
+    }
+    let docs = list_documents(http, session, COLLECTION_TASKS, &queries).await?;
+    docs.into_iter().map(parse_doc).collect()
+}
+
+pub async fn insert_task(
+    http: &reqwest::Client,
+    session: &Session,
+    project_id: &str,
+    title: &str,
+) -> Result<Task, AppwriteError> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err(AppwriteError::Unexpected("title is required".to_string()));
+    }
+    let doc = create_document(
+        http,
+        session,
+        COLLECTION_TASKS,
+        serde_json::json!({
+            "userId": session.user_id,
+            "projectId": project_id,
+            "title": title,
+            "description": serde_json::Value::Null,
+            "status": "TODO",
+            "priority": "MEDIUM",
+            "dueDate": serde_json::Value::Null,
+            "completedAt": serde_json::Value::Null,
+            "deletedAt": serde_json::Value::Null,
+        }),
+    )
+    .await?;
+    parse_doc(doc)
+}

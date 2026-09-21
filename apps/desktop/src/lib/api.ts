@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { Project, Task } from "@packages/domain/index";
 import type {
   AuthConfig,
   AuthState,
@@ -25,6 +26,12 @@ export const api = {
     }),
   pollOAuth: (successUrl: string, failureUrl: string) =>
     invoke<OAuthPoll>("poll_oauth", { successUrl, failureUrl }),
+
+  listProjects: () => invoke<Project[]>("list_projects"),
+  listTasks: (projectId?: string | null) =>
+    invoke<Task[]>("list_tasks", { projectId: projectId ?? null }),
+  createTask: (projectId: string, title: string) =>
+    invoke<Task>("create_task", { projectId, title }),
 
   getSettings: () => invoke<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>
