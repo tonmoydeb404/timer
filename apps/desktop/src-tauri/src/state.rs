@@ -9,6 +9,9 @@ use rusqlite::Connection;
 pub struct AppState {
     pub db: Mutex<Connection>,
     pub http: reqwest::Client,
+    /// Serializes timer mutations (including their network push) so two
+    /// rapid commands can never interleave and duplicate entries.
+    pub timer_lock: tokio::sync::Mutex<()>,
     pub app_data_dir: PathBuf,
 }
 
@@ -17,6 +20,7 @@ impl AppState {
         AppState {
             db: Mutex::new(conn),
             http: crate::appwrite::http_client(),
+            timer_lock: tokio::sync::Mutex::new(()),
             app_data_dir,
         }
     }

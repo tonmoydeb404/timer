@@ -1,6 +1,7 @@
 import { Badge } from "@packages/ui/components/badge";
 import { Button } from "@packages/ui/components/button";
 import { DataState } from "@packages/ui/components/data-state";
+import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import {
   Select,
   SelectContent,
@@ -11,6 +12,7 @@ import {
 import {
   ArrowLeftRight,
   CalendarDays,
+  Check,
   Clock,
   CloudCheck,
   CloudOff,
@@ -22,19 +24,41 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { formatDuration, formatDurationShort } from "@packages/domain/time";
 import { useApp } from "@/context/app-context";
+import { useTimer } from "@/context/timer-context";
 import { useTasks } from "@/hooks/use-tasks";
 import { cn } from "@/lib/utils";
 
-// Today tab: project strip, timer card, summaries, task queue.
-// Timer controls are Phase 3 — rendered disabled until the state machine
-// lands, so the layout is final but nothing pretends to track.
+// Today tab: project strip, live timer card, summaries, task queue.
+// Elapsed time derives from stored timestamps; the display ticks locally.
 export function TodayScreen() {
   const { auth } = useApp();
   const { projects, tasks, loading, error, refresh } = useTasks();
+  const {
+    view,
+    busy,
+    fetchedAt,
+    focusId,
+    setFocusId,
+    start,
+    takeBreak,
+    resume,
+    stop,
+    switchTo,
+  } = useTimer();
   const [projectFilter, setProjectFilter] = useState("ALL");
-  const [focusId, setFocusId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [, setTick] = useState(0);
 
   const online = auth?.status === "active";
+  const status = view?.status ?? "IDLE";
+  const running = status !== "IDLE";
+
+  // Tick the display while a session is open.
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [running]);
 
   const visible = useMemo(
     () =>
@@ -48,16 +72,52 @@ export function TodayScreen() {
     if (focusId === null && visible.length > 0) {
       setFocusId(visible[0]?.$id ?? null);
     }
-  }, [focusId, visible]);
+  }, [focusId, visible, setFocusId]);
 
   useEffect(() => {
     if (focusId !== null && !visible.some((t) => t.$id === focusId)) {
       setFocusId(visible[0]?.$id ?? null);
     }
-  }, [focusId, visible]);
+  }, [focusId, visible, setFocusId]);
+
+  // Live totals: snapshot from Rust plus time since the snapshot.
+  const elapsed = running ? Math.max(0, Date.now() - fetchedAt) : 0;
+  const openKind = view?.segments.find((s) => s.ended_at_ms === null)?.type;
+  const totalMs = (view?.total_ms ?? 0) + elapsed;
+  const workMs = (view?.work_ms ?? 0) + (openKind === "WORK" ? elapsed : 0);
+  const breakMs = (view?.break_ms ?? 0) + (openKind === "BREAK" ? elapsed : 0);
 
   const focus = visible.find((t) => t.$id === focusId) ?? null;
-  const focusProject = projects.find((p) => p.$id === focus?.projectId)?.name;
+  const runningTaskId = view?.task_id ?? null;
+  const displayTask = running
+    ? (tasks.find((t) => t.$id === runningTaskId) ?? null)
+    : focus;
+  const displayProject = projects.find(
+    (p) => p.$id === displayTask?.projectId,
+  )?.name;
+
+  const activeRowId = running ? runningTaskId : focusId;
+
+  function handleToggle() {
+    if (busy) return;
+    if (status === "IDLE") {
+      if (focus) void start(focus.$id, focus.title);
+    } else {
+      void stop();
+    }
+  }
+
+  function handleTaskTap(taskId: string, taskTitle: string) {
+    if (busy) return;
+    if (!running) {
+      setFocusId(taskId);
+    } else if (taskId !== runningTaskId) {
+      void switchTo(taskId, taskTitle);
+    }
+  }
+
+  const toggleOn = status !== "IDLE";
+  const onBreak = status === "BREAK";
 
   return (
     <section className="mx-auto grid h-full w-full max-w-[420px] gap-4 overflow-y-auto scrollbar-thin px-3.5 pt-2 pb-4">
@@ -65,7 +125,12 @@ export function TodayScreen() {
       <div className="grid gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+            <span
+              className={cn(
+                "h-2 w-2 shrink-0 rounded-full",
+                running ? "animate-pulse bg-emerald-500" : "bg-emerald-500",
+              )}
+            />
             <Select
               value={projectFilter}
               onValueChange={(v) => setProjectFilter(v ?? "ALL")}
@@ -90,11 +155,11 @@ export function TodayScreen() {
         <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-2">
           <NotebookPen size={16} className="shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
-            {focus ? focus.title : "Pick a task below to focus"}
+            {displayTask ? displayTask.title : "Pick a task below to focus"}
           </span>
-          {focusProject && (
+          {displayProject && (
             <span className="shrink-0 font-mono text-[10px] font-medium text-muted-foreground">
-              {focusProject}
+              {displayProject}
             </span>
           )}
         </div>
@@ -105,53 +170,120 @@ export function TodayScreen() {
         <div className="flex items-center justify-between gap-3 pt-1">
           <div className="grid">
             <span className="mb-1 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600" />
-              <span className="font-mono text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-                Ready
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  status === "WORKING" && "animate-pulse bg-emerald-500",
+                  status === "BREAK" && "animate-pulse bg-amber-500",
+                  status === "IDLE" && "bg-slate-300 dark:bg-slate-600",
+                )}
+              />
+              <span
+                className={cn(
+                  "font-mono text-[10px] font-semibold tracking-wider uppercase",
+                  status === "WORKING" &&
+                    "text-emerald-700 dark:text-emerald-400",
+                  status === "BREAK" && "text-amber-700 dark:text-amber-400",
+                  status === "IDLE" && "text-muted-foreground",
+                )}
+              >
+                {status === "WORKING"
+                  ? "Logging time"
+                  : status === "BREAK"
+                    ? "On break"
+                    : "Ready"}
               </span>
             </span>
             <span className="font-mono text-[38px] leading-none font-bold tracking-tight tabular-nums text-ink">
-              {formatDuration(0)}
+              {formatDuration(totalMs)}
             </span>
             <span className="mt-1 font-mono text-[11px] font-medium text-muted-foreground">
-              No active session
+              {running ? "Session elapsed" : "No active session"}
             </span>
           </div>
           <div className="flex shrink-0 flex-col items-center gap-1.5">
             <button
               type="button"
-              disabled
-              title="Timer arrives in Phase 3"
-              aria-label="Start timer (coming in Phase 3)"
-              className="flex h-9 w-16 cursor-not-allowed items-center rounded-full bg-slate-300 px-1 shadow-inner dark:bg-slate-700"
+              onClick={handleToggle}
+              disabled={busy || (status === "IDLE" && !focus)}
+              title={
+                status === "IDLE"
+                  ? "Start tracking the focused task"
+                  : "Stop timer"
+              }
+              aria-label={toggleOn ? "Stop timer" : "Start timer"}
+              className={cn(
+                "flex h-9 w-16 items-center rounded-full px-1 shadow-inner transition-colors",
+                toggleOn
+                  ? onBreak
+                    ? "bg-amber-500"
+                    : "bg-emerald-600"
+                  : "bg-slate-300 dark:bg-slate-700",
+                "not-disabled:cursor-pointer disabled:opacity-70",
+              )}
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-md">
-                <Play size={18} className="text-slate-500" />
+              <span
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-md transition-transform",
+                  toggleOn ? "translate-x-7" : "translate-x-0",
+                )}
+              >
+                {toggleOn ? (
+                  <Pause
+                    size={18}
+                    className={cn(
+                      "font-bold",
+                      onBreak ? "text-amber-700" : "text-emerald-700",
+                    )}
+                  />
+                ) : (
+                  <Play size={18} className="text-slate-500" />
+                )}
               </span>
             </button>
-            <span className="font-mono text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
-              Off
+            <span
+              className={cn(
+                "font-mono text-[11px] font-bold tracking-wide uppercase",
+                status === "WORKING" &&
+                  "text-emerald-700 dark:text-emerald-400",
+                status === "BREAK" && "text-amber-700 dark:text-amber-400",
+                status === "IDLE" && "text-muted-foreground",
+              )}
+            >
+              {toggleOn ? "On" : "Off"}
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+          {onBreak ? (
+            <Button
+              onClick={() => void resume()}
+              disabled={busy}
+              className="bg-emerald-600 text-white hover:bg-emerald-600/90"
+            >
+              <Play size={16} />
+              Resume
+            </Button>
+          ) : (
+            <Button
+              onClick={() => void takeBreak()}
+              disabled={busy || !running}
+              className="bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-400"
+            >
+              <Coffee size={16} />
+              Break
+            </Button>
+          )}
           <Button
-            disabled
-            title="Timer arrives in Phase 3"
-            className="bg-amber-500/10 text-amber-800 hover:bg-amber-500/10 dark:text-amber-400"
+            onClick={() => setPickerOpen(true)}
+            disabled={busy || !running}
+            variant="secondary"
           >
-            <Coffee size={16} />
-            Break
-          </Button>
-          <Button disabled title="Timer arrives in Phase 3" variant="secondary">
             <ArrowLeftRight size={16} />
             Switch
           </Button>
         </div>
-        <p className="-mt-2 text-center font-mono text-[10px] text-muted-foreground">
-          Live tracking arrives in Phase 3
-        </p>
       </section>
 
       {/* Summaries */}
@@ -167,10 +299,12 @@ export function TodayScreen() {
             />
           </div>
           <span className="font-mono text-xl font-bold tabular-nums text-ink">
-            {formatDurationShort(0)}
+            {formatDurationShort(workMs)}
           </span>
           <span className="mt-1 font-mono text-[10px] text-muted-foreground">
-            No time logged yet
+            {breakMs > 0
+              ? `${formatDurationShort(breakMs)} rest taken`
+              : "No time logged yet"}
           </span>
         </div>
         <div className="grid content-between rounded-xl border border-border bg-card p-3.5 shadow-sm">
@@ -215,20 +349,21 @@ export function TodayScreen() {
           {(rows) => (
             <ul className="grid gap-2">
               {rows.map((task) => {
-                const isFocus = task.$id === focusId;
+                const isActive = task.$id === activeRowId;
+                const isRunningTask = running && task.$id === runningTaskId;
                 return (
                   <li
                     key={task.$id}
                     className={cn(
                       "flex items-center justify-between rounded-xl border bg-card p-3.5 shadow-sm transition-colors",
-                      isFocus ? "border-emerald-600/40" : "border-border",
+                      isActive ? "border-emerald-600/40" : "border-border",
                     )}
                   >
                     <div className="flex min-w-0 items-center gap-3 pr-2">
                       <span
                         className={cn(
                           "h-2.5 w-2.5 shrink-0 rounded-full",
-                          isFocus
+                          isActive
                             ? "bg-emerald-500"
                             : "bg-slate-300 dark:bg-slate-600",
                         )}
@@ -238,7 +373,7 @@ export function TodayScreen() {
                           <span className="truncate text-xs font-semibold text-ink">
                             {task.title}
                           </span>
-                          {isFocus && (
+                          {isActive && (
                             <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-px font-mono text-[9px] font-bold text-emerald-700 dark:text-emerald-400">
                               ACTIVE
                             </span>
@@ -252,19 +387,37 @@ export function TodayScreen() {
                     </div>
                     <button
                       type="button"
-                      title={isFocus ? "Focused task" : "Focus this task"}
-                      aria-label={
-                        isFocus ? "Focused task" : `Focus ${task.title}`
+                      disabled={busy || isRunningTask}
+                      title={
+                        isRunningTask
+                          ? "Currently tracking"
+                          : running
+                            ? "Switch to this task"
+                            : "Focus this task"
                       }
-                      onClick={() => setFocusId(task.$id)}
+                      aria-label={
+                        isRunningTask
+                          ? "Currently tracking"
+                          : running
+                            ? `Switch to ${task.title}`
+                            : `Focus ${task.title}`
+                      }
+                      onClick={() => handleTaskTap(task.$id, task.title)}
                       className={cn(
                         "flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm transition-all active:scale-95",
-                        isFocus
+                        isActive
                           ? "bg-emerald-600 text-white"
                           : "bg-muted text-muted-foreground hover:bg-emerald-600 hover:text-white",
+                        "disabled:opacity-70",
                       )}
                     >
-                      {isFocus ? <Pause size={18} /> : <Play size={18} />}
+                      {isRunningTask ? (
+                        <Check size={18} />
+                      ) : isActive && running ? (
+                        <Pause size={18} />
+                      ) : (
+                        <Play size={18} />
+                      )}
                     </button>
                   </li>
                 );
@@ -286,15 +439,58 @@ export function TodayScreen() {
             <CloudOff size={15} className="text-amber-600" />
           )}
           <span className="font-mono text-[11px] font-medium">
-            {online ? "Auto-sync active" : "Offline"}
+            {!online
+              ? "Offline"
+              : (view?.pending_count ?? 0) > 0
+                ? `Sync pending (${view?.pending_count})`
+                : "Auto-sync active"}
           </span>
         </span>
-        {focus && (
+        {displayTask && (
           <span className="max-w-40 truncate font-mono text-[11px] text-faint">
-            Focus: {focus.title}
+            Focus: {displayTask.title}
           </span>
         )}
       </div>
+
+      {/* Switch-task picker */}
+      <ResponsiveSheet
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        title="Switch task"
+        description="Ends the current interval and starts tracking the selected task."
+        footer={
+          <Button variant="ghost" onClick={() => setPickerOpen(false)}>
+            Cancel
+          </Button>
+        }
+      >
+        <ul className="grid max-h-80 gap-2 overflow-y-auto scrollbar-thin">
+          {visible
+            .filter((t) => t.$id !== runningTaskId)
+            .map((task) => (
+              <li key={task.$id}>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setPickerOpen(false);
+                    void switchTo(task.$id, task.title);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:border-emerald-600/40 hover:bg-muted/60 disabled:opacity-60"
+                >
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
+                    {task.title}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    {projects.find((p) => p.$id === task.projectId)?.name ??
+                      "Unknown"}
+                  </span>
+                </button>
+              </li>
+            ))}
+        </ul>
+      </ResponsiveSheet>
     </section>
   );
 }

@@ -3,6 +3,7 @@ import { Toaster } from "@packages/ui/components/sonner";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ModalProvider } from "./context/modal-context";
 import { AppProvider, useApp } from "./context/app-context";
+import { TimerProvider } from "./context/timer-context";
 import { TabLayout } from "./layouts/tab-layout";
 import { LoginScreen } from "./screens/auth/login";
 import { HistoryScreen } from "./screens/history";
@@ -62,12 +63,14 @@ function AppRoutes() {
 export default function App() {
   return (
     <AppProvider>
-      <ModalProvider>
-        <HashRouter>
-          <AppRoutes />
-        </HashRouter>
-        <Toaster position="bottom-right" />
-      </ModalProvider>
+      <TimerProvider>
+        <ModalProvider>
+          <HashRouter>
+            <AppRoutes />
+          </HashRouter>
+          <Toaster position="bottom-right" />
+        </ModalProvider>
+      </TimerProvider>
     </AppProvider>
   );
 }

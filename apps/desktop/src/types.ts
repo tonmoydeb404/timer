@@ -36,3 +36,28 @@ export type OAuthPoll = {
   secret: string | null;
   message: string | null;
 };
+
+// ---- Timer (mirrors Rust timer.rs serde output) ----
+
+export type TimerStatus = "IDLE" | "WORKING" | "BREAK";
+
+export type SegmentType = "WORK" | "BREAK";
+
+export type SegmentView = {
+  type: SegmentType;
+  started_at_ms: number;
+  ended_at_ms: number | null;
+  duration_ms: number;
+};
+
+export type TimerView = {
+  status: TimerStatus;
+  task_id: string | null;
+  task_title: string | null;
+  started_at_ms: number | null;
+  total_ms: number;
+  work_ms: number;
+  break_ms: number;
+  segments: SegmentView[];
+  pending_count: number;
+};

@@ -140,9 +140,7 @@ fn headers(project: &str, session_secret: Option<&str>) -> HeaderMap {
 }
 
 fn status_error(status: reqwest::StatusCode, body: &str) -> AppwriteError {
-    if status == reqwest::StatusCode::UNAUTHORIZED
-        || status == reqwest::StatusCode::FORBIDDEN
-    {
+    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
         return AppwriteError::Unauthorized;
     }
     // Try to surface Appwrite's own message: {"message": "..."}.
@@ -150,7 +148,11 @@ fn status_error(status: reqwest::StatusCode, body: &str) -> AppwriteError {
         .ok()
         .and_then(|v| v.get("message")?.as_str().map(str::to_string))
         .unwrap_or_else(|| {
-            body.chars().take(300).collect::<String>().trim().to_string()
+            body.chars()
+                .take(300)
+                .collect::<String>()
+                .trim()
+                .to_string()
         });
     AppwriteError::Server(status.as_u16(), detail)
 }
@@ -289,6 +291,7 @@ const DATABASE_ID: &str = "timer";
 
 pub const COLLECTION_PROJECTS: &str = "projects";
 pub const COLLECTION_TASKS: &str = "tasks";
+pub const COLLECTION_TIME_ENTRIES: &str = "time_entries";
 
 pub struct Session {
     pub user_id: String,
@@ -441,6 +444,35 @@ pub struct Task {
 
 fn parse_doc<T: for<'de> Deserialize<'de>>(value: serde_json::Value) -> Result<T, AppwriteError> {
     serde_json::from_value(value).map_err(|e| AppwriteError::Unexpected(e.to_string()))
+}
+
+/// Pushes queued time entries in order. Stops at the first failure so rows
+/// keep their chronological order; failed entries stay queued with a bumped
+/// attempt counter. Never fails the caller's user action — leftover entries
+/// are reported via `pending_count` and retried on the next timer command.
+pub async fn push_pending(
+    http: &reqwest::Client,
+    session: &Session,
+    store: &mut crate::timer::TimerStore,
+) {
+    let mut done = 0;
+    for entry in store.pending.iter_mut() {
+        let data = serde_json::json!({
+            "userId": session.user_id,
+            "taskId": entry.task_id,
+            "type": entry.kind,
+            "startedAt": entry.started_at,
+            "endedAt": entry.ended_at,
+        });
+        match create_document(http, session, COLLECTION_TIME_ENTRIES, data).await {
+            Ok(_) => done += 1,
+            Err(_) => {
+                entry.attempts += 1;
+                break;
+            }
+        }
+    }
+    store.pending.drain(..done);
 }
 
 pub async fn fetch_projects(

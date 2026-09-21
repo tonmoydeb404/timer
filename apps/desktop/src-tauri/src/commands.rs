@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::appwrite::{self, AppwriteError, AuthConfig, AuthState, AuthStatus, AuthUser};
 use crate::db;
@@ -152,6 +152,97 @@ pub async fn create_task(
         .map_err(map_err)
 }
 
+// ---- Timer (desktop owns the live timer; Appwrite stores results) ----
+
+/// Runs a timer mutation under the timer lock: transition the store,
+/// persist it, push queued entries, persist again, then broadcast the view.
+/// Network failures never fail the user action — entries stay queued.
+async fn mutate_timer(
+    app: &AppHandle,
+    transition: impl FnOnce(
+        &mut crate::timer::TimerStore,
+        i64,
+    )
+        -> Result<Vec<crate::timer::PendingEntry>, crate::timer::TransitionError>,
+) -> Result<crate::timer::TimerView, String> {
+    let state = app.state::<AppState>();
+    let _guard = state.timer_lock.lock().await;
+    let now = crate::timer::now_ms();
+
+    let mut store = crate::timer::load(&state.app_data_dir);
+    let entries = transition(&mut store, now).map_err(map_err)?;
+    store.pending.extend(entries);
+    crate::timer::save(&state.app_data_dir, &store).map_err(map_err)?;
+
+    // Extract an owned session and drop the DB guard before any await:
+    // MutexGuard<Connection> is !Send.
+    let session: Option<appwrite::Session> = {
+        let conn = state.db.lock().map_err(map_err)?;
+        appwrite::require_session(&conn).ok()
+    };
+    if let Some(session) = session {
+        appwrite::push_pending(&state.http, &session, &mut store).await;
+        // Best effort: a failed save here only delays the next retry.
+        let _ = crate::timer::save(&state.app_data_dir, &store);
+    }
+
+    let view = crate::timer::view(&store, crate::timer::now_ms());
+    let _ = app.emit("timer://changed", &view);
+    Ok(view)
+}
+
+#[tauri::command]
+pub async fn get_timer_state(app: AppHandle) -> Result<crate::timer::TimerView, String> {
+    let state = app.state::<AppState>();
+    let store = crate::timer::load(&state.app_data_dir);
+    Ok(crate::timer::view(&store, crate::timer::now_ms()))
+}
+
+#[tauri::command]
+pub async fn start_timer(
+    app: AppHandle,
+    task_id: String,
+    task_title: String,
+) -> Result<crate::timer::TimerView, String> {
+    mutate_timer(&app, |store, now| {
+        crate::timer::start(store, &task_id, &task_title, now).map(|_| Vec::new())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn take_break(app: AppHandle) -> Result<crate::timer::TimerView, String> {
+    mutate_timer(&app, |store, now| {
+        crate::timer::take_break(store, now).map(|_| Vec::new())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn resume_timer(app: AppHandle) -> Result<crate::timer::TimerView, String> {
+    mutate_timer(&app, |store, now| {
+        crate::timer::resume(store, now).map(|_| Vec::new())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn stop_timer(app: AppHandle) -> Result<crate::timer::TimerView, String> {
+    mutate_timer(&app, crate::timer::stop).await
+}
+
+#[tauri::command]
+pub async fn switch_task(
+    app: AppHandle,
+    task_id: String,
+    task_title: String,
+) -> Result<crate::timer::TimerView, String> {
+    mutate_timer(&app, |store, now| {
+        crate::timer::switch_task(store, &task_id, &task_title, now)
+    })
+    .await
+}
+
 // ---- OAuth popup window (Rust-owned so no extra capabilities are needed) ----
 
 #[derive(Debug, serde::Serialize)]
@@ -186,9 +277,13 @@ pub async fn open_oauth_window(
     success_url: String,
     failure_url: String,
 ) -> Result<(), String> {
-    let project = appwrite::project_id().ok_or(AppwriteError::NotConfigured).map_err(map_err)?;
-    let success = url::Url::parse(&success_url).map_err(|e| format!("unexpected: bad success_url: {e}"))?;
-    let failure = url::Url::parse(&failure_url).map_err(|e| format!("unexpected: bad failure_url: {e}"))?;
+    let project = appwrite::project_id()
+        .ok_or(AppwriteError::NotConfigured)
+        .map_err(map_err)?;
+    let success =
+        url::Url::parse(&success_url).map_err(|e| format!("unexpected: bad success_url: {e}"))?;
+    let failure =
+        url::Url::parse(&failure_url).map_err(|e| format!("unexpected: bad failure_url: {e}"))?;
 
     if app.get_webview_window("oauth").is_some() {
         if let Some(window) = app.get_webview_window("oauth") {
@@ -229,8 +324,10 @@ pub async fn poll_oauth(
     success_url: String,
     failure_url: String,
 ) -> Result<OAuthPoll, String> {
-    let success = url::Url::parse(&success_url).map_err(|e| format!("unexpected: bad success_url: {e}"))?;
-    let failure = url::Url::parse(&failure_url).map_err(|e| format!("unexpected: bad failure_url: {e}"))?;
+    let success =
+        url::Url::parse(&success_url).map_err(|e| format!("unexpected: bad success_url: {e}"))?;
+    let failure =
+        url::Url::parse(&failure_url).map_err(|e| format!("unexpected: bad failure_url: {e}"))?;
 
     let Some(window) = app.get_webview_window("oauth") else {
         return Ok(OAuthPoll {
@@ -265,9 +362,7 @@ pub async fn poll_oauth(
                 status: OAuthPollStatus::Error,
                 user_id: None,
                 secret: None,
-                message: Some(
-                    "Sign-in callback did not include credentials.".to_string(),
-                ),
+                message: Some("Sign-in callback did not include credentials.".to_string()),
             }),
         }
     } else {
@@ -292,11 +387,7 @@ pub async fn get_settings(app: AppHandle) -> Result<HashMap<String, String>, Str
 }
 
 #[tauri::command]
-pub async fn set_setting(
-    app: AppHandle,
-    key: String,
-    value: String,
-) -> Result<(), String> {
+pub async fn set_setting(app: AppHandle, key: String, value: String) -> Result<(), String> {
     let state = app.state::<AppState>();
     let conn = state.db.lock().map_err(map_err)?;
     db::set_setting(&conn, &key, &value).map_err(map_err)
@@ -307,25 +398,19 @@ pub async fn set_setting(
 #[tauri::command]
 pub async fn enable_autostart(app: AppHandle) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch()
-        .enable()
-        .map_err(|e| e.to_string())
+    app.autolaunch().enable().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn disable_autostart(app: AppHandle) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch()
-        .disable()
-        .map_err(|e| e.to_string())
+    app.autolaunch().disable().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn is_autostart_enabled(app: AppHandle) -> Result<bool, String> {
     use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch()
-        .is_enabled()
-        .map_err(|e| e.to_string())
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
 
 // ---- Updater ----

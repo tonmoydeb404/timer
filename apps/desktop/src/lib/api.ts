@@ -6,6 +6,7 @@ import type {
   AuthState,
   AuthUser,
   OAuthPoll,
+  TimerView,
   UpdateInfo,
 } from "../types";
 
@@ -33,6 +34,15 @@ export const api = {
   createTask: (projectId: string, title: string) =>
     invoke<Task>("create_task", { projectId, title }),
 
+  getTimerState: () => invoke<TimerView>("get_timer_state"),
+  startTimer: (taskId: string, taskTitle: string) =>
+    invoke<TimerView>("start_timer", { taskId, taskTitle }),
+  takeBreak: () => invoke<TimerView>("take_break"),
+  resumeTimer: () => invoke<TimerView>("resume_timer"),
+  stopTimer: () => invoke<TimerView>("stop_timer"),
+  switchTask: (taskId: string, taskTitle: string) =>
+    invoke<TimerView>("switch_task", { taskId, taskTitle }),
+
   getSettings: () => invoke<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>
     invoke<void>("set_setting", { key, value }),
@@ -50,6 +60,14 @@ export function onUpdateAvailable(
   callback: (payload: UpdateInfo) => void,
 ): Promise<UnlistenFn> {
   return listen<UpdateInfo>("update://available", (event) =>
+    callback(event.payload),
+  );
+}
+
+export function onTimerChanged(
+  callback: (payload: TimerView) => void,
+): Promise<UnlistenFn> {
+  return listen<TimerView>("timer://changed", (event) =>
     callback(event.payload),
   );
 }

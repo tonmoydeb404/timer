@@ -7,6 +7,7 @@ mod commands;
 mod db;
 mod migrations;
 mod state;
+mod timer;
 mod tray;
 
 use state::AppState;
@@ -87,10 +88,34 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir).ok();
             std::fs::create_dir_all(app_data_dir.join("logs")).ok();
 
-            let conn = db::open_connection(&app_data_dir)
-                .expect("failed to open database");
+            let conn = db::open_connection(&app_data_dir).expect("failed to open database");
 
             app.manage(AppState::new(conn, app_data_dir));
+
+            // Retry any entries left pending by a previous run (e.g. the
+            // app was stopped offline). Silent when signed out.
+            let flush_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let state = flush_handle.state::<AppState>();
+                let _guard = state.timer_lock.lock().await;
+                let session = {
+                    match state.db.lock() {
+                        Ok(conn) => match appwrite::require_session(&conn) {
+                            Ok(s) => s,
+                            Err(_) => return,
+                        },
+                        Err(_) => return,
+                    }
+                };
+                let mut store = timer::load(&state.app_data_dir);
+                if store.pending.is_empty() {
+                    return;
+                }
+                appwrite::push_pending(&state.http, &session, &mut store).await;
+                let _ = timer::save(&state.app_data_dir, &store);
+                let view = timer::view(&store, timer::now_ms());
+                let _ = flush_handle.emit("timer://changed", &view);
+            });
 
             let updater_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -123,6 +148,12 @@ pub fn run() {
             commands::list_projects,
             commands::list_tasks,
             commands::create_task,
+            commands::get_timer_state,
+            commands::start_timer,
+            commands::take_break,
+            commands::resume_timer,
+            commands::stop_timer,
+            commands::switch_task,
             commands::get_settings,
             commands::set_setting,
             commands::enable_autostart,

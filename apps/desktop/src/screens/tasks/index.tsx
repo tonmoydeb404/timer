@@ -9,14 +9,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@packages/ui/components/select";
-import { ListPlus, RotateCw } from "lucide-react";
+import { ListPlus, RotateCw, Crosshair } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTimer } from "@/context/timer-context";
 import { useTasks } from "@/hooks/use-tasks";
+import { cn } from "@/lib/utils";
 
 // Tasks tab: search, full active-task list, quick-add. Management
 // (edit/delete) stays on the web dashboard.
 export function TasksScreen() {
   const { projects, tasks, loading, error, refresh, quickAdd } = useTasks();
+  const { focusId, setFocusId } = useTimer();
   const [search, setSearch] = useState("");
   const [quickTitle, setQuickTitle] = useState("");
   const [quickProject, setQuickProject] = useState("");
@@ -97,6 +100,26 @@ export function TasksScreen() {
                 <Badge variant="outline" className="shrink-0">
                   {projectName(task.projectId)}
                 </Badge>
+                <button
+                  type="button"
+                  title={
+                    task.$id === focusId ? "Focused task" : "Focus this task"
+                  }
+                  aria-label={
+                    task.$id === focusId
+                      ? "Focused task"
+                      : `Focus ${task.title}`
+                  }
+                  onClick={() => setFocusId(task.$id)}
+                  className={cn(
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors",
+                    task.$id === focusId
+                      ? "bg-emerald-600 text-white"
+                      : "text-muted-foreground hover:bg-muted hover:text-ink",
+                  )}
+                >
+                  <Crosshair size={14} />
+                </button>
               </li>
             ))}
           </ul>
