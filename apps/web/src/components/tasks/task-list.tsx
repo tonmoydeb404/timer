@@ -12,6 +12,7 @@ import {
 } from "@packages/ui/components/alert-dialog";
 import { Badge } from "@packages/ui/components/badge";
 import { Button } from "@packages/ui/components/button";
+import { DataState } from "@packages/ui/components/data-state";
 import { Input } from "@packages/ui/components/input";
 import {
   Select,
@@ -22,11 +23,7 @@ import {
 } from "@packages/ui/components/select";
 import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type {
-  Project,
-  Task,
-  TaskStatus,
-} from "@packages/domain/index";
+import type { Project, Task, TaskStatus } from "@packages/domain/index";
 import { cn } from "@/lib/utils";
 import { deleteTask, listTasks, updateTask } from "@/lib/db";
 import { TaskFormDialog } from "./task-form-dialog";
@@ -53,7 +50,12 @@ type Props = {
   actions?: React.ReactNode;
 };
 
-export function TaskList({ userId, projects, presetProjectId, actions }: Props) {
+export function TaskList({
+  userId,
+  projects,
+  presetProjectId,
+  actions,
+}: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +77,10 @@ export function TaskList({ userId, projects, presetProjectId, actions }: Props) 
     setError(null);
     try {
       setTasks(
-        await listTasks(userId, presetProjectId ? { projectId: presetProjectId } : {}),
+        await listTasks(
+          userId,
+          presetProjectId ? { projectId: presetProjectId } : {},
+        ),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load tasks.");
@@ -92,7 +97,11 @@ export function TaskList({ userId, projects, presetProjectId, actions }: Props) 
     const q = search.trim().toLowerCase();
     return tasks.filter((t) => {
       if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
-      if (!presetProjectId && projectFilter !== "ALL" && t.projectId !== projectFilter)
+      if (
+        !presetProjectId &&
+        projectFilter !== "ALL" &&
+        t.projectId !== projectFilter
+      )
         return false;
       if (q && !t.title.toLowerCase().includes(q)) return false;
       return true;
@@ -101,7 +110,9 @@ export function TaskList({ userId, projects, presetProjectId, actions }: Props) 
 
   async function toggleDone(task: Task) {
     const next: TaskStatus = task.status === "DONE" ? "TODO" : "DONE";
-    setTasks((prev) => prev.map((t) => (t.$id === task.$id ? { ...t, status: next } : t)));
+    setTasks((prev) =>
+      prev.map((t) => (t.$id === task.$id ? { ...t, status: next } : t)),
+    );
     try {
       const saved = await updateTask(task.$id, { status: next });
       setTasks((prev) => prev.map((t) => (t.$id === task.$id ? saved : t)));
@@ -137,7 +148,10 @@ export function TaskList({ userId, projects, presetProjectId, actions }: Props) 
           className="h-9 max-w-56"
         />
         {!presetProjectId && (
-          <Select value={projectFilter} onValueChange={(v) => setProjectFilter(v ?? "ALL")}>
+          <Select
+            value={projectFilter}
+            onValueChange={(v) => setProjectFilter(v ?? "ALL")}
+          >
             <SelectTrigger className="h-9 w-44">
               <SelectValue placeholder="Project" />
             </SelectTrigger>
@@ -174,83 +188,105 @@ export function TaskList({ userId, projects, presetProjectId, actions }: Props) 
         </span>
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading tasks…</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {!loading && !error && visible.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          {tasks.length === 0
-            ? "No tasks yet — create the first one."
-            : "No tasks match these filters."}
-        </p>
-      )}
-
-      <ul className="grid gap-2">
-        {visible.map((task) => (
-          <li
-            key={task.$id}
-            className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={task.status === "DONE" ? "Reopen task" : "Complete task"}
-              onClick={() => void toggleDone(task)}
-              className={cn(
-                "h-7 w-7 shrink-0 rounded-full border",
-                task.status === "DONE" &&
-                  "border-primary bg-primary text-primary-foreground",
-              )}
-            >
-              {task.status === "DONE" && <Check size={14} />}
+      <DataState
+        loading={loading}
+        error={error}
+        data={visible}
+        onRetry={() => void refresh()}
+        emptyTitle={tasks.length === 0 ? "No tasks yet" : "No matching tasks"}
+        emptyHint={
+          tasks.length === 0
+            ? "Create the first one to get started."
+            : "Try a different search or filter."
+        }
+        emptyAction={
+          tasks.length === 0 && !actions ? (
+            <Button size="sm" onClick={openCreate}>
+              <Plus size={14} />
+              New task
             </Button>
-            <div className="grid min-w-0 flex-1 gap-0.5">
-              <span
-                className={cn(
-                  "truncate text-sm font-medium",
-                  task.status === "DONE" && "text-muted-foreground line-through",
-                )}
+          ) : undefined
+        }
+      >
+        {(rows) => (
+          <ul className="grid gap-2">
+            {rows.map((task) => (
+              <li
+                key={task.$id}
+                className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
               >
-                {task.title}
-              </span>
-              <span className="flex flex-wrap items-center gap-1.5">
-                {!presetProjectId && (
-                  <Badge variant="outline">{projectName(task.projectId)}</Badge>
-                )}
-                <Badge variant="outline" className={PRIORITY_STYLES[task.priority]}>
-                  {task.priority.charAt(0) + task.priority.slice(1).toLowerCase()}
-                </Badge>
-                {task.status === "IN_PROGRESS" && (
-                  <Badge variant="secondary">In progress</Badge>
-                )}
-                {task.dueDate && (
-                  <span className="text-xs text-muted-foreground">
-                    Due {task.dueDate.slice(0, 10)}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={
+                    task.status === "DONE" ? "Reopen task" : "Complete task"
+                  }
+                  onClick={() => void toggleDone(task)}
+                  className={cn(
+                    "h-7 w-7 shrink-0 rounded-full border",
+                    task.status === "DONE" &&
+                      "border-primary bg-primary text-primary-foreground",
+                  )}
+                >
+                  {task.status === "DONE" && <Check size={14} />}
+                </Button>
+                <div className="grid min-w-0 flex-1 gap-0.5">
+                  <span
+                    className={cn(
+                      "truncate text-sm font-medium",
+                      task.status === "DONE" &&
+                        "text-muted-foreground line-through",
+                    )}
+                  >
+                    {task.title}
                   </span>
-                )}
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Edit task"
-              onClick={() => {
-                setEditing(task);
-                setDialogOpen(true);
-              }}
-            >
-              <Pencil size={14} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Delete task"
-              onClick={() => setDeleting(task)}
-            >
-              <Trash2 size={14} />
-            </Button>
-          </li>
-        ))}
-      </ul>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {!presetProjectId && (
+                      <Badge variant="outline">
+                        {projectName(task.projectId)}
+                      </Badge>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className={PRIORITY_STYLES[task.priority]}
+                    >
+                      {task.priority.charAt(0) +
+                        task.priority.slice(1).toLowerCase()}
+                    </Badge>
+                    {task.status === "IN_PROGRESS" && (
+                      <Badge variant="secondary">In progress</Badge>
+                    )}
+                    {task.dueDate && (
+                      <span className="text-xs text-muted-foreground">
+                        Due {task.dueDate.slice(0, 10)}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Edit task"
+                  onClick={() => {
+                    setEditing(task);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <Pencil size={14} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Delete task"
+                  onClick={() => setDeleting(task)}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DataState>
 
       <TaskFormDialog
         open={dialogOpen}
@@ -265,12 +301,17 @@ export function TaskList({ userId, projects, presetProjectId, actions }: Props) 
             const next = exists
               ? prev.map((t) => (t.$id === saved.$id ? saved : t))
               : [saved, ...prev];
-            return next.sort((a, b) => b.$updatedAt.localeCompare(a.$updatedAt));
+            return next.sort((a, b) =>
+              b.$updatedAt.localeCompare(a.$updatedAt),
+            );
           });
         }}
       />
 
-      <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this task?</AlertDialogTitle>

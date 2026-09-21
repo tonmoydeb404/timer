@@ -1,14 +1,8 @@
 "use client";
 
 import { Button } from "@packages/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@packages/ui/components/dialog";
 import { Input } from "@packages/ui/components/input";
+import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import {
   Select,
   SelectContent,
@@ -18,11 +12,7 @@ import {
 } from "@packages/ui/components/select";
 import { Textarea } from "@packages/ui/components/textarea";
 import { useEffect, useState } from "react";
-import type {
-  Project,
-  Task,
-  TaskPriority,
-} from "@packages/domain/index";
+import type { Project, Task, TaskPriority } from "@packages/domain/index";
 import { createTask, updateTask } from "@/lib/db";
 
 const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH"];
@@ -99,73 +89,72 @@ export function TaskFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{task ? "Edit task" : "New task"}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs doing?"
-            autoFocus
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <Select
-              value={projectId}
-              onValueChange={(v) => setProjectId(v ?? "")}
-              disabled={Boolean(fixedProjectId)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.$id} value={p.$id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={priority}
-              onValueChange={(v) => setPriority(v as TaskPriority)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORITIES.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p.charAt(0) + p.slice(1).toLowerCase()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-          <Textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Details (optional)"
-            rows={3}
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
-        <DialogFooter>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={task ? "Edit task" : "New task"}
+      footer={
+        <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : task ? "Save changes" : "Create task"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <Input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="What needs doing?"
+        autoFocus
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <Select
+          value={projectId}
+          onValueChange={(v) => setProjectId(v ?? "")}
+          disabled={Boolean(fixedProjectId)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Project" />
+          </SelectTrigger>
+          <SelectContent>
+            {projects.map((p) => (
+              <SelectItem key={p.$id} value={p.$id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={priority}
+          onValueChange={(v) => setPriority(v as TaskPriority)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Priority" />
+          </SelectTrigger>
+          <SelectContent>
+            {PRIORITIES.map((p) => (
+              <SelectItem key={p} value={p}>
+                {p.charAt(0) + p.slice(1).toLowerCase()}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <Input
+        type="date"
+        value={dueDate}
+        onChange={(e) => setDueDate(e.target.value)}
+      />
+      <Textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Details (optional)"
+        rows={3}
+      />
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </ResponsiveSheet>
   );
 }

@@ -12,19 +12,19 @@ import {
 } from "@packages/ui/components/alert-dialog";
 import { Badge } from "@packages/ui/components/badge";
 import { Button } from "@packages/ui/components/button";
-import {
-  Archive,
-  ArchiveRestore,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { DataState } from "@packages/ui/components/data-state";
+import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Project, Task } from "@packages/domain/index";
 import { appPaths } from "@/config/paths-config";
 import { useAuth } from "@/lib/auth-context";
-import { deleteProject, listProjects, listTasks, updateProject } from "@/lib/db";
+import {
+  deleteProject,
+  listProjects,
+  listTasks,
+  updateProject,
+} from "@/lib/db";
 import { ProjectDialog } from "@/components/projects/project-dialog";
 
 export function ProjectsClient() {
@@ -38,21 +38,28 @@ export function ProjectsClient() {
   const [deleting, setDeleting] = useState<Project | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
     if (!user) return;
-    listProjects(user.$id)
-      .then(async (list) => {
-        setProjects(list);
-        const tasks: Task[] = await listTasks(user.$id);
-        const counts: Record<string, number> = {};
-        for (const t of tasks) counts[t.projectId] = (counts[t.projectId] ?? 0) + 1;
-        setTaskCounts(counts);
-      })
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Couldn't load projects."),
-      )
-      .finally(() => setLoading(false));
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await listProjects(user.$id);
+      setProjects(list);
+      const tasks: Task[] = await listTasks(user.$id);
+      const counts: Record<string, number> = {};
+      for (const t of tasks)
+        counts[t.projectId] = (counts[t.projectId] ?? 0) + 1;
+      setTaskCounts(counts);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't load projects.");
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   if (!user) return null;
 
@@ -66,7 +73,9 @@ export function ProjectsClient() {
       const saved = await updateProject(project.$id, { status: next });
       setProjects((prev) => prev.map((p) => (p.$id === saved.$id ? saved : p)));
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Couldn't update the project.");
+      setActionError(
+        err instanceof Error ? err.message : "Couldn't update the project.",
+      );
     }
   }
 
@@ -84,9 +93,6 @@ export function ProjectsClient() {
       );
     }
   }
-
-  const active = projects.filter((p) => p.status === "ACTIVE");
-  const archived = projects.filter((p) => p.status === "ARCHIVED");
 
   function renderRow(project: Project) {
     return (
@@ -165,26 +171,36 @@ export function ProjectsClient() {
         </Button>
       </div>
 
-      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-      {error && <p className="text-sm text-destructive">{error}</p>}
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
-      {!loading && !error && projects.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No projects yet — create the first one.
-        </p>
-      )}
-
-      {active.length > 0 && (
-        <ul className="grid gap-2">{active.map(renderRow)}</ul>
-      )}
-
-      {archived.length > 0 && (
-        <div className="grid gap-2">
-          <h2 className="text-sm font-medium text-muted-foreground">Archived</h2>
-          <ul className="grid gap-2">{archived.map(renderRow)}</ul>
-        </div>
-      )}
+      <DataState
+        loading={loading}
+        error={error}
+        data={projects}
+        onRetry={() => void reload()}
+        emptyTitle="No projects yet"
+        emptyHint="Create the first one to get started."
+      >
+        {(rows) => (
+          <>
+            {rows.some((p) => p.status === "ACTIVE") && (
+              <ul className="grid gap-2">
+                {rows.filter((p) => p.status === "ACTIVE").map(renderRow)}
+              </ul>
+            )}
+            {rows.some((p) => p.status === "ARCHIVED") && (
+              <div className="grid gap-2">
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  Archived
+                </h2>
+                <ul className="grid gap-2">
+                  {rows.filter((p) => p.status === "ARCHIVED").map(renderRow)}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </DataState>
 
       <ProjectDialog
         open={dialogOpen}
@@ -201,13 +217,16 @@ export function ProjectsClient() {
         }}
       />
 
-      <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
             <AlertDialogDescription>
-              The project will be hidden everywhere. Projects with active
-              tasks can&apos;t be deleted — archive them instead.
+              The project will be hidden everywhere. Projects with active tasks
+              can&apos;t be deleted — archive them instead.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

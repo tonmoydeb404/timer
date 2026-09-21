@@ -1,14 +1,8 @@
 "use client";
 
 import { Button } from "@packages/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@packages/ui/components/dialog";
 import { Input } from "@packages/ui/components/input";
+import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import { Textarea } from "@packages/ui/components/textarea";
 import { useEffect, useState } from "react";
 import type { Project } from "@packages/domain/index";
@@ -23,7 +17,13 @@ type Props = {
   onSaved: (project: Project) => void;
 };
 
-export function ProjectDialog({ open, onOpenChange, userId, project, onSaved }: Props) {
+export function ProjectDialog({
+  open,
+  onOpenChange,
+  userId,
+  project,
+  onSaved,
+}: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
@@ -56,42 +56,43 @@ export function ProjectDialog({ open, onOpenChange, userId, project, onSaved }: 
       onSaved(saved);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save the project.");
+      setError(
+        err instanceof Error ? err.message : "Couldn't save the project.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{project ? "Rename project" : "New project"}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Client Website"
-            autoFocus
-          />
-          <Textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What is this about? (optional)"
-            rows={3}
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
-        <DialogFooter>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={project ? "Rename project" : "New project"}
+      footer={
+        <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : project ? "Save changes" : "Create project"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="e.g. Client Website"
+        autoFocus
+      />
+      <Textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="What is this about? (optional)"
+        rows={3}
+      />
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </ResponsiveSheet>
   );
 }

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { appPaths } from "@/config/paths-config";
 import { APP_NAME } from "@/content/homepage";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </span>
               <span className="font-medium">{APP_NAME}</span>
             </Link>
-            <nav className="hidden items-center gap-1 md:flex" aria-label="Product">
+            <nav
+              className="hidden items-center gap-1 md:flex"
+              aria-label="Product"
+            >
               {navItems.map((item) => {
                 const active =
                   item.href === appPaths.dashboard
@@ -56,12 +60,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             {!loading && user && (
               <span className="hidden max-w-48 truncate text-sm text-muted-foreground sm:block">
                 {user.name || user.email}
               </span>
             )}
+            <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={signOut}>
               <LogOut size={14} />
               Sign out

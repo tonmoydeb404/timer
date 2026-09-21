@@ -1,4 +1,5 @@
 import { Button } from "@packages/ui/components/button";
+import { DataState } from "@packages/ui/components/data-state";
 import { Input } from "@packages/ui/components/input";
 import { Badge } from "@packages/ui/components/badge";
 import {
@@ -83,8 +84,8 @@ export function HomeScreen() {
   }
 
   return (
-    <section className="min-h-0 flex-1 overflow-auto scrollbar-thin p-6">
-      <div className="mx-auto grid max-w-lg gap-6">
+    <section className="min-h-0 flex-1 overflow-auto scrollbar-thin p-4">
+      <div className="mx-auto grid max-w-md gap-5">
         <div className="grid gap-1 text-center">
           <h1 className="text-xl font-[760] text-ink">Today</h1>
           <p className="text-[0.82rem] text-muted-foreground">
@@ -102,7 +103,9 @@ export function HomeScreen() {
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-inset text-muted-foreground">
             <Timer size={22} />
           </span>
-          <p className="text-[0.84rem] font-medium text-ink">No timer running</p>
+          <p className="text-[0.84rem] font-medium text-ink">
+            No timer running
+          </p>
           <p className="max-w-xs text-[0.78rem] text-muted-foreground">
             Time tracking arrives in Phase 3 — pick a task below when it does.
           </p>
@@ -131,51 +134,57 @@ export function HomeScreen() {
             className="h-9"
           />
 
-          {loading && (
-            <p className="text-[0.78rem] text-muted-foreground">
-              Loading tasks…
-            </p>
-          )}
-          {error && <p className="text-[0.78rem] text-danger">{error}</p>}
-
-          {!loading && !error && visible.length === 0 && (
-            <p className="rounded-lg border border-dashed border-border p-6 text-center text-[0.78rem] text-muted-foreground">
-              {tasks.length === 0
-                ? "No active tasks — add one below or manage them on the web dashboard."
-                : "No tasks match your search."}
-            </p>
-          )}
-
-          <ul className="grid gap-2">
-            {visible.map((task) => (
-              <li
-                key={task.$id}
-                className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2"
-              >
-                <span className="min-w-0 flex-1 truncate text-[0.82rem] text-ink">
-                  {task.title}
-                </span>
-                <Badge variant="outline" className="shrink-0">
-                  {projectName(task.projectId)}
-                </Badge>
-              </li>
-            ))}
-          </ul>
+          <DataState
+            loading={loading}
+            error={error}
+            data={visible}
+            onRetry={() => void refresh()}
+            skeletonCount={4}
+            emptyTitle={
+              tasks.length === 0 ? "No active tasks" : "No matching tasks"
+            }
+            emptyHint={
+              tasks.length === 0
+                ? "Add one below, or manage tasks on the web dashboard."
+                : "Try a different search."
+            }
+          >
+            {(rows) => (
+              <ul className="grid gap-2">
+                {rows.map((task) => (
+                  <li
+                    key={task.$id}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[0.82rem] text-ink">
+                      {task.title}
+                    </span>
+                    <Badge variant="outline" className="shrink-0">
+                      {projectName(task.projectId)}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DataState>
 
           <div className="grid gap-2 rounded-xl border border-border bg-surface p-3">
+            <Select
+              value={quickProject}
+              onValueChange={(v) => setQuickProject(v ?? "")}
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue placeholder="Project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((p) => (
+                  <SelectItem key={p.$id} value={p.$id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="flex gap-2">
-              <Select value={quickProject} onValueChange={(v) => setQuickProject(v ?? "")}>
-                <SelectTrigger className="h-9 w-36 shrink-0">
-                  <SelectValue placeholder="Project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.$id} value={p.$id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Input
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
