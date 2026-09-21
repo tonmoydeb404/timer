@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "My App",
+  "version": "0.1.0",
+  "identifier": "com.example.myapp",
+  "build": {
+    "beforeDevCommand": "pnpm dev:vite",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "My App",
+        "hiddenTitle": true,
+        "width": 1100,
+        "height": 700,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "visible": false,
+        "skipTaskbar": false,
+        "alwaysOnTop": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/your-username/my-app/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4RjA5MDkzMDZGNzIzNDIKUldSQ0kvY0drNUR3bU4wa3JJQW50d1ZzdHdRL3RiRG1FQ28vY2VhM3JKRUxKczhNZ1lGQThwanQK"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "publisher": "Your Name",
+    "category": "public.app-category.developer-tools",
+    "shortDescription": "A cross-platform desktop app built with Tauri.",
+    "longDescription": "My App is a cross-platform desktop app built with Tauri 2, React, and Rust. This placeholder description lives in brand.json and is propagated to every consumer file by scripts/sync-brand.mjs.",
+    "copyright": "Copyright (c) 2026 Your Name",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

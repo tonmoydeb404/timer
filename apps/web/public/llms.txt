@@ -1,0 +1,15 @@
+# <!-- @brand:appName -->My App<!-- /@brand:appName -->
+
+> <!-- @brand:descriptionLong -->My App is a cross-platform desktop app built with Tauri 2, React, and Rust. This placeholder description lives in brand.json and is propagated to every consumer file by scripts/sync-brand.mjs.<!-- /@brand:descriptionLong -->
+
+## Key facts
+
+- **Platforms:** macOS, Windows, and Linux. Pre-built binaries on GitHub Releases.
+- **License:** MIT. Full source on GitHub.
+- **Tech stack:** Tauri 2 (Rust backend + React 19 + TypeScript + Tailwind v4 frontend). This marketing site is Next.js.
+
+## Documentation
+
+- Website: <!-- @brand:website -->https://example.com<!-- /@brand:website -->
+- Download: <!-- @brand:downloadUrl -->https://github.com/your-username/my-app/releases/latest<!-- /@brand:downloadUrl -->
+- Repository: <!-- @brand:repository -->https://github.com/your-username/my-app<!-- /@brand:repository -->

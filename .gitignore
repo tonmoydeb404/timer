@@ -1,0 +1,7 @@
+node_modules
+
+.turbo
+.playwright-mcp
+
+# Tauri updater signing keypair — never commit
+.keys

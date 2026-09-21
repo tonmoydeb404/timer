@@ -1,0 +1,41 @@
+{
+  "name": "myapp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "My App — A cross-platform desktop app built with Tauri.",
+  "license": "MIT",
+  "homepage": "https://example.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/my-app.git"
+  },
+  "keywords": [
+    "tauri",
+    "desktop-app",
+    "template",
+    "myapp"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @apps/web dev",
+    "dev:desktop": "pnpm --filter @apps/desktop dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "sync-brand": "node scripts/sync-brand.mjs",
+    "sync-brand:check": "node scripts/sync-brand.mjs --check",
+    "init-app": "node scripts/init-app.mjs",
+    "release:tag": "node scripts/release-tag-sync.mjs",
+    "prepare": "git config core.hooksPath .husky || true"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4",
+    "turbo": "^2.10.9",
+    "typescript": "5.9.2"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
+  }
+}

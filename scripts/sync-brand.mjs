@@ -1,0 +1,486 @@
+// @ts-check
+/**
+ * Single-source-of-truth brand synchronizer.
+ *
+ * `brand.json` (repo root) is the ONLY file you should edit for brand values.
+ * This script propagates those values into every consumer file:
+ *   - structured JSON/TOML configs (tauri.conf.json, package.json, Cargo.toml)
+ *   - generated typed wrappers (brand.ts, brand.rs, scripts-config.ts)
+ *   - token-marked prose (README.md, llms.txt, pricing.md, paths-config.ts)
+ *   - line-keyed shell/ruby configs (setup.sh, setup.ps1, the Homebrew cask)
+ *
+ * Derived values (all computed from brand.json — nothing else to keep in sync):
+ *   slug      → crate/binary name, db filename, storage-key prefix, cask token
+ *   libName   → Rust lib crate name (`<slug with _>_lib`, referenced in main.rs)
+ *   repoSlug  → "owner/repo" extracted from the repository URL
+ *
+ * Modes:
+ *   pnpm sync-brand          rewrite all consumers from brand.json
+ *   pnpm sync-brand --check  exit 1 if any consumer is out of sync (CI guard)
+ */
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const REPO_ROOT = path.resolve(path.dirname(__filename), "..");
+const CHECK = process.argv.includes("--check");
+
+/** @type {Record<string, string>} */
+const raw = JSON.parse(
+  readFileSync(path.join(REPO_ROOT, "brand.json"), "utf8"),
+);
+const brand = raw;
+
+const repoSlug = brand.repository.replace(/^https:\/\/github\.com\//, "");
+const repoGit = `${brand.repository}.git`;
+
+// The Rust crate name. Hyphens are allowed in package names but become
+// underscores when referenced as a lib (`my-app` → `my_app_lib`).
+const crateName = brand.slug;
+const libName = `${brand.slug.replace(/-/g, "_")}_lib`;
+
+// Flat map of every token the prose markers can reference.
+const markers = {
+  appName: brand.appName,
+  slug: brand.slug,
+  version: brand.version,
+  identifier: brand.identifier,
+  developerName: brand.developer.name,
+  website: brand.developer.website,
+  repository: brand.repository,
+  repositoryGit: repoGit,
+  repoSlug,
+  downloadUrl: brand.downloadUrl,
+  licenseUrl: brand.licenseUrl,
+  updaterEndpoint: brand.updaterEndpoint,
+  setupSh: brand.scripts.setupSh,
+  setupPs1: brand.scripts.setupPs1,
+  uninstallSh: brand.scripts.uninstallSh,
+  uninstallPs1: brand.scripts.uninstallPs1,
+  descriptionShort: brand.description.short,
+  descriptionLong: brand.description.long,
+  copyright: brand.copyright,
+  homebrewTap: brand.homebrewTap,
+};
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+
+const read = (rel) => {
+  const abs = path.join(REPO_ROOT, rel);
+  return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
+};
+
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Replace every `<!-- @brand:KEY -->..../@brand:KEY -->` with the marker value. */
+const applyInlineMarkers = (text) => {
+  let out = text;
+  for (const [key, val] of Object.entries(markers)) {
+    const re = new RegExp(
+      `(<!--\\s*@brand:${key}\\s*-->)([\\s\\S]*?)(<!--\\s*/@brand:${key}\\s*-->)`,
+      "g",
+    );
+    out = out.replace(re, (_, open, _inner, close) => `${open}${val}${close}`);
+  }
+  return out;
+};
+
+/** Replace content between `// @brand:generated-start` and `-end` comment lines. */
+const applyTsBlock = (text, block) =>
+  text.replace(
+    new RegExp(
+      `(^//\\s*@brand:generated-start\\s*\\n)([\\s\\S]*?)(^//\\s*@brand:generated-end)`,
+      "m",
+    ),
+    (_, start, _inner, end) => `${start}${block}${end}`,
+  );
+
+/** Replace content between `# @brand:start <name>` / `# @brand:end <name>` shell block. */
+const applyShellBlock = (text, name, block) =>
+  text.replace(
+    new RegExp(
+      `(^#\\s*@brand:start\\s+${escRe(name)}\\s*\\n)([\\s\\S]*?)(^#\\s*@brand:end\\s+${escRe(name)})`,
+      "m",
+    ),
+    (_, start, _inner, end) => `${start}${block}${end}`,
+  );
+
+/** Replace content between `<!-- @brand:start NAME -->` and `<!-- @brand:end NAME -->`.
+ *  Used for markdown regions (e.g. badges) whose brand values can't sit inside a
+ *  link's `()` (HTML comments there break CommonMark parsing): the whole region is
+ *  regenerated from brand.json each run, with no comment tags left in the URL. */
+const applyBlock = (text, name, block) =>
+  text.replace(
+    new RegExp(
+      `(<!--\\s*@brand:start\\s+${escRe(name)}\\s*-->)([\\s\\S]*?)(<!--\\s*@brand:end\\s+${escRe(name)}\\s*-->)`,
+    ),
+    (_, start, _inner, end) => `${start}${block}${end}`,
+  );
+
+/** Set a `key = value` line in TOML; returns null if the key is absent. */
+const setTomlField = (text, key, value) => {
+  const re = new RegExp(`^(${escRe(key)}\\s*=\\s*).*$`, "m");
+  if (!re.test(text)) return null;
+  return text.replace(re, `$1${value}`);
+};
+
+/** Set the `name` field directly under a `[section]` header in TOML.
+ *  (Comment lines between the header and the field are allowed.) */
+const setTomlSectionName = (text, section, value) => {
+  const re = new RegExp(
+    `(\\[${escRe(section)}\\]\\n(?:#[^\\n]*\\n)*name\\s*=\\s*").*?(")`,
+  );
+  if (!re.test(text)) return null;
+  return text.replace(re, `$1${value}$2`);
+};
+
+/** Set the `version` of a specific `[[package]]` entry in a Cargo.lock file. */
+const setCargoLockPackageVersion = (text, packageName, version) => {
+  const re = new RegExp(
+    `(\\[\\[package\\]\\]\\nname = "${escRe(packageName)}"\\nversion = ").*?(")`,
+  );
+  if (!re.test(text)) {
+    throw new Error(
+      `sync-brand: package "${packageName}" not found in Cargo.lock`,
+    );
+  }
+  return text.replace(re, `$1${version}$2`);
+};
+
+/** Rename a `[[package]]` entry in a Cargo.lock file (old → new name). */
+const renameCargoLockPackage = (text, oldName, newName) => {
+  const re = new RegExp(`(\\[\\[package\\]\\]\\nname = ")${escRe(oldName)}(")`);
+  if (!re.test(text)) return text;
+  return text.replace(re, `$1${newName}$2`);
+};
+
+/** Set a TOML field, inserting after `afterKey` when it does not yet exist. */
+const upsertTomlField = (text, key, value, afterKey) => {
+  const replaced = setTomlField(text, key, value);
+  if (replaced !== null) return replaced;
+  const re = new RegExp(`^(${escRe(afterKey)}\\s*=\\s*.*$)`, "m");
+  return text.replace(re, `$1\n${key} = ${value}`);
+};
+
+/** Replace a line matching `prefix` with `replacement` (full line). */
+const setLine = (text, prefix, replacement) => {
+  const re = new RegExp(`^${escRe(prefix)}.*$`, "m");
+  return text.replace(re, replacement);
+};
+
+// ---------------------------------------------------------------------------
+// generated file bodies
+// ---------------------------------------------------------------------------
+
+const GENERATED_NOTE =
+  "/**\n * GENERATED BY scripts/sync-brand.mjs — DO NOT EDIT BY HAND.\n * Source of truth: brand.json at the repo root. Run `pnpm sync-brand`.\n */";
+
+const brandTs = `${GENERATED_NOTE}
+
+export const brand = ${JSON.stringify(brand, null, 2)} as const;
+
+export type Brand = typeof brand;
+`;
+
+const brandRs = `//! GENERATED BY scripts/sync-brand.mjs — DO NOT EDIT BY HAND.
+//! Source of truth: brand.json at the repo root. Run \`pnpm sync-brand\`.
+#![allow(dead_code)]
+
+pub const APP_NAME: &str = ${JSON.stringify(brand.appName)};
+pub const SLUG: &str = ${JSON.stringify(brand.slug)};
+pub const IDENTIFIER: &str = ${JSON.stringify(brand.identifier)};
+pub const DEVELOPER_NAME: &str = ${JSON.stringify(brand.developer.name)};
+pub const WEBSITE: &str = ${JSON.stringify(brand.developer.website)};
+pub const REPOSITORY: &str = ${JSON.stringify(brand.repository)};
+pub const DOWNLOAD_URL: &str = ${JSON.stringify(brand.downloadUrl)};
+pub const LICENSE_URL: &str = ${JSON.stringify(brand.licenseUrl)};
+pub const COPYRIGHT: &str = ${JSON.stringify(brand.copyright)};
+pub const HOMEBREW_TAP: &str = ${JSON.stringify(brand.homebrewTap)};
+pub const SETUP_SCRIPT_URL: &str = ${JSON.stringify(brand.scripts.setupSh)};
+
+/// App version, read from Cargo.toml at compile time.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+`;
+
+const scriptsConfigTs = `${GENERATED_NOTE}
+
+export const scriptUrls = ${JSON.stringify(brand.scripts, null, 2)} as const;
+`;
+
+// ---------------------------------------------------------------------------
+// transforms: each returns the desired file content for a relative path
+// ---------------------------------------------------------------------------
+
+const desktopPkg = JSON.parse(read("apps/desktop/package.json"));
+desktopPkg.version = brand.version;
+desktopPkg.description = `${brand.appName} desktop app — ${brand.description.short} Built with Tauri 2.`;
+desktopPkg.homepage = brand.developer.website;
+desktopPkg.repository.url = repoGit;
+desktopPkg.keywords = ["tauri", "desktop", brand.slug];
+
+const rootPkg = JSON.parse(read("package.json"));
+rootPkg.name = brand.slug;
+rootPkg.version = brand.version;
+rootPkg.description = `${brand.appName} — ${brand.description.short}`;
+rootPkg.homepage = brand.developer.website;
+rootPkg.repository.url = repoGit;
+rootPkg.keywords = ["tauri", "desktop-app", "template", brand.slug];
+
+const webPkg = JSON.parse(read("apps/web/package.json"));
+webPkg.version = brand.version;
+webPkg.description = `${brand.appName} website — ${brand.description.short}`;
+webPkg.keywords = ["nextjs", "website", brand.slug];
+
+const tauriConf = JSON.parse(read("apps/desktop/src-tauri/tauri.conf.json"));
+tauriConf.productName = brand.appName;
+tauriConf.version = brand.version;
+tauriConf.identifier = brand.identifier;
+tauriConf.app.windows[0].title = brand.appName;
+tauriConf.plugins.updater.endpoints[0] = brand.updaterEndpoint;
+tauriConf.bundle.publisher = brand.developer.name;
+tauriConf.bundle.copyright = brand.copyright;
+tauriConf.bundle.shortDescription = brand.description.short;
+tauriConf.bundle.longDescription = brand.description.long;
+
+// Dev override config: keeps a separate identifier/productName so dev builds
+// never collide with the installed production app.
+const tauriDevConf = JSON.parse(
+  read("apps/desktop/src-tauri/tauri.dev.conf.json"),
+);
+tauriDevConf.identifier = `${brand.identifier}.dev`;
+tauriDevConf.productName = `${brand.appName} Dev`;
+
+// Cargo.toml: rename the crate + lib BEFORE using the old name to patch
+// Cargo.lock (which still refers to the pre-rename package).
+const prevCargo = read("apps/desktop/src-tauri/Cargo.toml");
+const prevCrateName = prevCargo.match(/\[package\]\s*\nname = "([^"]+)"/)?.[1];
+
+let cargo = prevCargo;
+cargo = setTomlSectionName(cargo, "package", crateName) ?? cargo;
+cargo = setTomlSectionName(cargo, "lib", libName) ?? cargo;
+cargo = upsertTomlField(cargo, "version", `"${brand.version}"`, "name");
+cargo = upsertTomlField(
+  cargo,
+  "description",
+  `"${brand.description.short}"`,
+  "version",
+);
+cargo = upsertTomlField(
+  cargo,
+  "authors",
+  `["${brand.developer.name}"]`,
+  "edition",
+);
+cargo = upsertTomlField(
+  cargo,
+  "homepage",
+  `"${brand.developer.website}"`,
+  "authors",
+);
+cargo = upsertTomlField(
+  cargo,
+  "repository",
+  `"${brand.repository}"`,
+  "homepage",
+);
+
+let cargoLock = read("apps/desktop/src-tauri/Cargo.lock");
+if (prevCrateName && prevCrateName !== crateName) {
+  cargoLock = renameCargoLockPackage(cargoLock, prevCrateName, crateName);
+}
+cargoLock = setCargoLockPackageVersion(cargoLock, crateName, brand.version);
+
+// main.rs: the lib crate reference follows the `<slug>_lib::run()` convention.
+let mainRs = read("apps/desktop/src-tauri/src/main.rs");
+mainRs = mainRs.replace(
+  /^(\s*)[a-z0-9_]+::run\(\)$/m,
+  `$1${libName}::run()`,
+);
+
+// index.html: window title + pre-hydration theme storage key (must match the
+// storageKey in src/components/theme-provider.tsx, which reads brand.slug).
+let indexHtml = read("apps/desktop/index.html");
+indexHtml = indexHtml.replace(
+  /(<title>)[^<]*(<\/title>)/,
+  `$1${brand.appName}$2`,
+);
+indexHtml = indexHtml.replace(
+  /localStorage\.getItem\("[^"]*"\)/,
+  `localStorage.getItem("${brand.slug}-theme")`,
+);
+
+// Homebrew cask: fully regenerated from brand.json. version + sha256 are
+// release-managed (CI seds them after each release), so they are preserved
+// from the existing file when present.
+const caskPath = `Casks/${brand.slug}.rb`;
+const existingCask = read(caskPath) ?? "";
+const caskVersion =
+  existingCask.match(/version "([^"]*)"/)?.[1] ?? brand.version;
+const caskSha = existingCask.match(/sha256 "([^"]*)"/)?.[1] ?? "no-hash-yet";
+const cask = `cask "${brand.slug}" do
+  arch arm: "aarch64"
+
+  version "${caskVersion}"
+  sha256 "${caskSha}"
+
+  url "https://github.com/${repoSlug}/releases/download/v#{version}/${brand.appName}_#{version}_#{arch}.dmg"
+  name "${brand.appName}"
+  desc "${brand.description.short}"
+  homepage "${brand.repository}"
+
+  depends_on macos: :big_sur
+  depends_on arch: :arm64
+
+  app "${brand.appName}.app"
+
+  # Unsigned/un-notarized build: strip the quarantine flag Gatekeeper adds on download.
+  postflight do
+    system_command "/usr/bin/xattr",
+                    args: ["-cr", "#{appdir}/${brand.appName}.app"]
+  end
+
+  zap trash: [
+    "~/Library/Application Support/${brand.identifier}",
+    "~/Library/Caches/${brand.identifier}",
+    "~/Library/Preferences/${brand.identifier}.plist",
+    "~/Library/Saved Application State/${brand.identifier}.savedState",
+  ]
+end
+`;
+
+const shUsageBlock = `#   curl -fsSL ${brand.scripts.setupSh} | sh
+#   curl -fsSL ${brand.scripts.setupSh} | sh -s -- v${brand.version}
+`;
+// Any remaining name references in the setup scripts (echo copy,
+// /Applications paths, artifact names like "My App_1.0.0_amd64.deb", mktemp
+// templates, env vars) follow the placeholder names Ordito/ordito/ORDITO —
+// rewrite them.
+const rebrandNames = (text) =>
+  text
+    .replace(/Ordito/g, () => brand.appName)
+    .replace(/ordito/g, () => brand.slug)
+    .replace(/ORDITO/g, () => brand.slug.toUpperCase());
+
+let setupSh = read("setup/unix.sh");
+setupSh = applyShellBlock(setupSh, "usage", shUsageBlock);
+setupSh = setLine(setupSh, `APP_NAME=`, `APP_NAME="${brand.appName}"`);
+setupSh = setLine(setupSh, `PACKAGE=`, `PACKAGE="${brand.slug}"`);
+setupSh = setLine(setupSh, `TAP=`, `TAP="${brand.homebrewTap}"`);
+setupSh = setLine(setupSh, `TAP_URL=`, `TAP_URL="${repoGit}"`);
+setupSh = setLine(setupSh, `REPO=`, `REPO="${repoSlug}"`);
+setupSh = setLine(setupSh, `DEFAULT_VERSION=`, `DEFAULT_VERSION="v${brand.version}"`);
+setupSh = rebrandNames(setupSh);
+
+const ps1UsageBlock = `#   irm ${brand.scripts.setupPs1} | iex
+`;
+let setupPs1 = read("setup/windows.ps1");
+setupPs1 = applyShellBlock(setupPs1, "usage", ps1UsageBlock);
+setupPs1 = setLine(setupPs1, `$Repo = `, `$Repo = "${repoSlug}"`);
+setupPs1 = setLine(setupPs1, `$AppName = `, `$AppName = "${brand.appName}"`);
+setupPs1 = setLine(setupPs1, `$DefaultVersion = `, `$DefaultVersion = "v${brand.version}"`);
+setupPs1 = rebrandNames(setupPs1);
+
+const uninstallShUsageBlock = `#   curl -fsSL ${brand.scripts.uninstallSh} | sh
+`;
+let uninstallSh = read("setup/unix-uninstall.sh");
+uninstallSh = applyShellBlock(uninstallSh, "usage", uninstallShUsageBlock);
+uninstallSh = setLine(uninstallSh, `TAP=`, `TAP="${brand.homebrewTap}"`);
+uninstallSh = setLine(uninstallSh, `REPO=`, `REPO="${repoSlug}"`);
+uninstallSh = setLine(uninstallSh, `IDENTIFIER=`, `IDENTIFIER="${brand.identifier}"`);
+uninstallSh = setLine(uninstallSh, `APP_NAME=`, `APP_NAME="${brand.appName}"`);
+uninstallSh = setLine(uninstallSh, `PACKAGE=`, `PACKAGE="${brand.slug}"`);
+uninstallSh = rebrandNames(uninstallSh);
+
+const uninstallPs1UsageBlock = `#   irm ${brand.scripts.uninstallPs1} | iex
+`;
+let uninstallPs1 = read("setup/windows-uninstall.ps1");
+uninstallPs1 = applyShellBlock(uninstallPs1, "usage", uninstallPs1UsageBlock);
+uninstallPs1 = setLine(uninstallPs1, `$Repo = `, `$Repo = "${repoSlug}"`);
+uninstallPs1 = setLine(uninstallPs1, `$Identifier = `, `$Identifier = "${brand.identifier}"`);
+uninstallPs1 = setLine(uninstallPs1, `$AppName = `, `$AppName = "${brand.appName}"`);
+uninstallPs1 = rebrandNames(uninstallPs1);
+
+const externalUrlsBlock = `export const externalUrls = {
+  site: "${brand.developer.website}",
+  appName: "${brand.appName}",
+  descriptionShort: "${brand.description.short}",
+  download: "${brand.downloadUrl}",
+  repository: "${brand.repository}",
+  license: "${brand.licenseUrl}",
+} as const;
+`;
+const pathsConfig = applyTsBlock(
+  read("apps/web/src/config/paths-config.ts"),
+  externalUrlsBlock,
+);
+
+// Markdown regions regenerated from brand.json. Blank lines around the content
+// are intentional: without them the `<!-- @brand:start -->` comment (an HTML
+// block) would absorb the adjacent markdown and stop it rendering on GitHub.
+const badgeBlock = `\n\n[![Release](https://img.shields.io/github/v/release/${repoSlug})](${brand.downloadUrl})\n[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)\n[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](#download)\n\n`;
+const downloadLinkBlock = `\n\n[Download the latest release &raquo;](${brand.downloadUrl})\n\n`;
+
+const readme = applyBlock(
+  applyBlock(applyInlineMarkers(read("README.md")), "badges", badgeBlock),
+  "downloadLink",
+  downloadLinkBlock,
+);
+const desktopReadme = applyInlineMarkers(read("apps/desktop/README.md"));
+const webReadme = applyInlineMarkers(read("apps/web/README.md"));
+const llmsTxt = applyInlineMarkers(read("apps/web/public/llms.txt"));
+const pricingMd = applyInlineMarkers(read("apps/web/public/pricing.md"));
+
+// ---------------------------------------------------------------------------
+// apply
+// ---------------------------------------------------------------------------
+
+const targets = {
+  "apps/desktop/src/lib/brand.ts": brandTs,
+  "apps/desktop/src-tauri/src/brand.rs": brandRs,
+  "apps/web/src/config/scripts-config.ts": scriptsConfigTs,
+  "apps/desktop/package.json": `${JSON.stringify(desktopPkg, null, 2)}\n`,
+  "package.json": `${JSON.stringify(rootPkg, null, 2)}\n`,
+  "apps/web/package.json": `${JSON.stringify(webPkg, null, 2)}\n`,
+  "apps/desktop/src-tauri/tauri.conf.json": `${JSON.stringify(tauriConf, null, 2)}\n`,
+  "apps/desktop/src-tauri/tauri.dev.conf.json": `${JSON.stringify(tauriDevConf, null, 2)}\n`,
+  "apps/desktop/src-tauri/Cargo.toml": cargo,
+  "apps/desktop/src-tauri/Cargo.lock": cargoLock,
+  "apps/desktop/src-tauri/src/main.rs": mainRs,
+  "apps/desktop/index.html": indexHtml,
+  [caskPath]: cask,
+  "setup/unix.sh": setupSh,
+  "setup/windows.ps1": setupPs1,
+  "setup/unix-uninstall.sh": uninstallSh,
+  "setup/windows-uninstall.ps1": uninstallPs1,
+  "apps/web/src/config/paths-config.ts": pathsConfig,
+  "README.md": readme,
+  "apps/desktop/README.md": desktopReadme,
+  "apps/web/README.md": webReadme,
+  "apps/web/public/llms.txt": llmsTxt,
+  "apps/web/public/pricing.md": pricingMd,
+};
+
+const drift = [];
+for (const [rel, content] of Object.entries(targets)) {
+  const current = read(rel);
+  if (current === content) continue;
+  drift.push(rel);
+  if (!CHECK) writeFileSync(path.join(REPO_ROOT, rel), content, "utf8");
+}
+
+if (CHECK) {
+  if (drift.length) {
+    console.error("brand: out of sync — run `pnpm sync-brand` and recommit:");
+    for (const f of drift) console.error(`  ${f}`);
+    process.exit(1);
+  }
+  console.log("brand: in sync ✓");
+} else {
+  const wrote = drift.length;
+  console.log(
+    `brand: ${wrote === 0 ? "already in sync ✓" : `synced ${wrote} file${wrote === 1 ? "" : "s"} ✓`}`,
+  );
+}

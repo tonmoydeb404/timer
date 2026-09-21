@@ -1,0 +1,61 @@
+{
+  "name": "@apps/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "My App desktop app — A cross-platform desktop app built with Tauri. Built with Tauri 2.",
+  "license": "MIT",
+  "homepage": "https://example.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/my-app.git",
+    "directory": "apps/desktop"
+  },
+  "keywords": [
+    "tauri",
+    "desktop",
+    "myapp"
+  ],
+  "scripts": {
+    "dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "dev:vite": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/poppins": "^5.3.0",
+    "@packages/ui": "workspace:*",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-updater": "^2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.23.0",
+    "next-themes": "^0.4.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-router-dom": "^7.18.2",
+    "shadcn": "^4.11.0",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.6.0",
+    "semver": "^7.7.2"
+  },
+  "devDependencies": {
+    "@packages/eslint-config": "workspace:*",
+    "@tailwindcss/vite": "^4.3.2",
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^22.15.3",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/semver": "^7.7.0",
+    "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^9.39.1",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
