@@ -28,7 +28,7 @@ export type AuthConfig = {
   project_configured: boolean;
 };
 
-export type OAuthPollStatus = "pending" | "success" | "closed" | "error";
+export type OAuthPollStatus = "pending" | "success" | "error";
 
 export type OAuthPoll = {
   status: OAuthPollStatus;

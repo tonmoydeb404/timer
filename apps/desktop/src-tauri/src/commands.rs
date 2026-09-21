@@ -252,14 +252,13 @@ pub async fn switch_task(
     .await
 }
 
-// ---- OAuth popup window (Rust-owned so no extra capabilities are needed) ----
+// ---- Browser OAuth (system browser + loopback callback server) ----
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OAuthPollStatus {
     Pending,
     Success,
-    Closed,
     Error,
 }
 
@@ -271,34 +270,130 @@ pub struct OAuthPoll {
     pub message: Option<String>,
 }
 
-fn strip_query(url: &url::Url) -> String {
-    let mut clone = url.clone();
-    clone.set_query(None);
-    clone.set_fragment(None);
-    clone.to_string()
+const OAUTH_SERVER_LIFETIME_SECS: u64 = 360;
+
+fn oauth_page(title: &str, body: &str) -> String {
+    format!(
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">\
+         <title>{title}</title>\
+         <style>body{{font-family:system-ui,sans-serif;display:flex;min-height:90vh;\
+         align-items:center;justify-content:center;background:#f8fafc;color:#0f172a;\
+         margin:0}}main{{text-align:center;max-width:24rem;padding:2rem}}h1{{font-size:1.1rem}}</style>\
+         </head><body><main><h1>{title}</h1><p>{body}</p></main></body></html>",
+    )
 }
 
-/// Opens (or focuses) the Google sign-in window. The frontend polls
-/// `poll_oauth` until the user finishes or closes the window.
+fn respond(mut stream: std::net::TcpStream, status: &str, html: &str) {
+    let body = html.as_bytes();
+    let _ = stream.set_write_timeout(Some(std::time::Duration::from_secs(5)));
+    let _ = std::io::Write::write_all(
+        &mut stream,
+        format!(
+            "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        )
+        .as_bytes(),
+    );
+    let _ = std::io::Write::write_all(&mut stream, body);
+}
+
+/// Decides an OAuth callback request purely from its path: the outcome to
+/// store (if the attempt is decided) plus the HTTP status/body to reply.
+fn decide_oauth_request(path: &str) -> (Option<crate::state::OAuthOutcome>, &'static str, String) {
+    if path.starts_with("/callback") {
+        let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
+        let params: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
+            .into_owned()
+            .collect();
+        match (params.get("userId"), params.get("secret")) {
+            (Some(user_id), Some(secret)) => (
+                Some(crate::state::OAuthOutcome::Success {
+                    user_id: user_id.clone(),
+                    secret: secret.clone(),
+                }),
+                "200 OK",
+                oauth_page("Signed in", "You can close this tab and return to the app."),
+            ),
+            _ => (
+                Some(crate::state::OAuthOutcome::Failed(
+                    "Sign-in callback did not include credentials.".to_string(),
+                )),
+                "200 OK",
+                oauth_page(
+                    "Sign-in incomplete",
+                    "The callback did not include credentials. You can close this tab.",
+                ),
+            ),
+        }
+    } else if path.starts_with("/error") {
+        (
+            Some(crate::state::OAuthOutcome::Failed(
+                "Google sign-in failed or was cancelled.".to_string(),
+            )),
+            "200 OK",
+            oauth_page(
+                "Sign-in cancelled",
+                "You can close this tab and try again from the app.",
+            ),
+        )
+    } else {
+        (None, "404 Not Found", oauth_page("Not found", ""))
+    }
+}
+
+/// Handles one callback request. Returns true when the OAuth attempt is
+/// decided (success or failure) and the server can shut down.
+fn handle_oauth_request(stream: std::net::TcpStream, app: &AppHandle) -> bool {
+    use std::io::Read;
+
+    let request_line = stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .ok()
+        .and_then(|_| {
+            let mut buf = [0u8; 8192];
+            let n = (&stream).take(buf.len() as u64).read(&mut buf).ok()?;
+            String::from_utf8(buf[..n].to_vec()).ok()
+        })
+        .and_then(|text| text.lines().next().map(str::to_string))
+        .unwrap_or_default();
+    let path = request_line
+        .split_whitespace()
+        .nth(1)
+        .unwrap_or("/")
+        .to_string();
+
+    let (outcome, status, html) = decide_oauth_request(&path);
+    respond(stream, status, &html);
+    if let Some(outcome) = outcome {
+        if let Ok(mut guard) = app.state::<AppState>().oauth_result.lock() {
+            *guard = Some(outcome);
+        }
+        return true;
+    }
+    false
+}
+
+/// Opens the Google sign-in page in the system browser. Appwrite redirects
+/// back to a loopback server owned by this process; the frontend polls
+/// `poll_oauth` for the captured credentials.
 #[tauri::command]
-pub async fn open_oauth_window(
-    app: AppHandle,
-    success_url: String,
-    failure_url: String,
-) -> Result<(), String> {
+pub async fn open_oauth_window(app: AppHandle) -> Result<(), String> {
     let project = appwrite::project_id()
         .ok_or(AppwriteError::NotConfigured)
         .map_err(map_err)?;
-    let success =
-        url::Url::parse(&success_url).map_err(|e| format!("unexpected: bad success_url: {e}"))?;
-    let failure =
-        url::Url::parse(&failure_url).map_err(|e| format!("unexpected: bad failure_url: {e}"))?;
 
-    if app.get_webview_window("oauth").is_some() {
-        if let Some(window) = app.get_webview_window("oauth") {
-            let _ = window.set_focus();
-        }
-        return Ok(());
+    let listener =
+        std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| format!("unexpected: {e}"))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| format!("unexpected: {e}"))?
+        .port();
+    let callback = format!("http://127.0.0.1:{port}/callback");
+    let failure = format!("http://127.0.0.1:{port}/error");
+
+    // Reset any previous attempt's result.
+    if let Ok(mut guard) = app.state::<AppState>().oauth_result.lock() {
+        *guard = None;
     }
 
     let mut login = url::Url::parse(&format!(
@@ -309,78 +404,62 @@ pub async fn open_oauth_window(
     login
         .query_pairs_mut()
         .append_pair("project", &project)
-        .append_pair("success", success.as_str())
-        .append_pair("failure", failure.as_str());
+        .append_pair("success", &callback)
+        .append_pair("failure", &failure);
 
-    tauri::WebviewWindowBuilder::new(
-        &app,
-        "oauth",
-        tauri::WebviewUrl::External(login.as_str().parse().map_err(map_err)?),
-    )
-    .title("Sign in with Google")
-    .inner_size(480.0, 680.0)
-    .center()
-    .build()
-    .map_err(map_err)?;
+    tauri_plugin_opener::open_url(login.as_str(), None::<&str>).map_err(map_err)?;
+
+    // Blocking accept loop on a background thread; exits after one decision
+    // or when the lifetime expires (the frontend has its own timeout too).
+    std::thread::spawn(move || {
+        let _ = listener.set_nonblocking(true);
+        let start = std::time::Instant::now();
+        let lifetime = std::time::Duration::from_secs(OAUTH_SERVER_LIFETIME_SECS);
+        while start.elapsed() < lifetime {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    if handle_oauth_request(stream, &app) {
+                        break;
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                }
+                Err(_) => break,
+            }
+        }
+    });
     Ok(())
 }
 
-/// Checks the OAuth window URL for the Appwrite callback
-/// (`?userId=…&secret=…` appended to the success URL).
+/// Returns the captured OAuth result, if the browser flow finished.
 #[tauri::command]
-pub async fn poll_oauth(
-    app: AppHandle,
-    success_url: String,
-    failure_url: String,
-) -> Result<OAuthPoll, String> {
-    let success =
-        url::Url::parse(&success_url).map_err(|e| format!("unexpected: bad success_url: {e}"))?;
-    let failure =
-        url::Url::parse(&failure_url).map_err(|e| format!("unexpected: bad failure_url: {e}"))?;
-
-    let Some(window) = app.get_webview_window("oauth") else {
-        return Ok(OAuthPoll {
-            status: OAuthPollStatus::Closed,
-            user_id: None,
-            secret: None,
-            message: None,
-        });
-    };
-
-    let current = window.url().map_err(map_err)?;
-    if strip_query(&current) == strip_query(&failure) {
-        let _ = window.close();
-        return Ok(OAuthPoll {
-            status: OAuthPollStatus::Error,
-            user_id: None,
-            secret: None,
-            message: Some("Google sign-in failed or was cancelled.".to_string()),
-        });
-    }
-    if strip_query(&current) == strip_query(&success) {
-        let params: HashMap<String, String> = current.query_pairs().into_owned().collect();
-        let _ = window.close();
-        match (params.get("userId"), params.get("secret")) {
-            (Some(user_id), Some(secret)) => Ok(OAuthPoll {
-                status: OAuthPollStatus::Success,
-                user_id: Some(user_id.clone()),
-                secret: Some(secret.clone()),
-                message: None,
-            }),
-            _ => Ok(OAuthPoll {
-                status: OAuthPollStatus::Error,
-                user_id: None,
-                secret: None,
-                message: Some("Sign-in callback did not include credentials.".to_string()),
-            }),
-        }
-    } else {
-        Ok(OAuthPoll {
+pub async fn poll_oauth(app: AppHandle) -> Result<OAuthPoll, String> {
+    let outcome = app
+        .state::<AppState>()
+        .oauth_result
+        .lock()
+        .map_err(map_err)?
+        .clone();
+    match outcome {
+        None => Ok(OAuthPoll {
             status: OAuthPollStatus::Pending,
             user_id: None,
             secret: None,
             message: None,
-        })
+        }),
+        Some(crate::state::OAuthOutcome::Success { user_id, secret }) => Ok(OAuthPoll {
+            status: OAuthPollStatus::Success,
+            user_id: Some(user_id),
+            secret: Some(secret),
+            message: None,
+        }),
+        Some(crate::state::OAuthOutcome::Failed(message)) => Ok(OAuthPoll {
+            status: OAuthPollStatus::Error,
+            user_id: None,
+            secret: None,
+            message: Some(message),
+        }),
     }
 }
 
@@ -442,4 +521,46 @@ pub async fn install_update(app: AppHandle) -> Result<(), String> {
         None => return Err("No update available".into()),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::OAuthOutcome;
+
+    #[test]
+    fn callback_with_credentials_succeeds() {
+        let (outcome, status, _) = decide_oauth_request("/callback?userId=abc&secret=xyz");
+        assert_eq!(status, "200 OK");
+        match outcome {
+            Some(OAuthOutcome::Success { user_id, secret }) => {
+                assert_eq!(user_id, "abc");
+                assert_eq!(secret, "xyz");
+            }
+            other => panic!("expected success, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn callback_without_credentials_fails() {
+        let (outcome, status, _) = decide_oauth_request("/callback");
+        assert_eq!(status, "200 OK");
+        assert!(matches!(outcome, Some(OAuthOutcome::Failed(_))));
+    }
+
+    #[test]
+    fn error_path_fails() {
+        let (outcome, status, _) = decide_oauth_request("/error?foo=bar");
+        assert_eq!(status, "200 OK");
+        assert!(matches!(outcome, Some(OAuthOutcome::Failed(_))));
+    }
+
+    #[test]
+    fn unrelated_paths_keep_waiting() {
+        for path in ["/", "/favicon.ico", "/robots.txt"] {
+            let (outcome, status, _) = decide_oauth_request(path);
+            assert_eq!(status, "404 Not Found");
+            assert!(outcome.is_none(), "path {path} should not decide");
+        }
+    }
 }

@@ -22,13 +22,8 @@ export const api = {
     invoke<AuthUser>("set_session", { userId, secret }),
   signOut: () => invoke<void>("sign_out"),
 
-  openOAuthWindow: (successUrl: string, failureUrl: string) =>
-    invoke<void>("open_oauth_window", {
-      successUrl,
-      failureUrl,
-    }),
-  pollOAuth: (successUrl: string, failureUrl: string) =>
-    invoke<OAuthPoll>("poll_oauth", { successUrl, failureUrl }),
+  openOAuthWindow: () => invoke<void>("open_oauth_window"),
+  pollOAuth: () => invoke<OAuthPoll>("poll_oauth"),
 
   listProjects: () => invoke<Project[]>("list_projects"),
   listTasks: (projectId?: string | null) =>

@@ -100,8 +100,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const outcome = await signInWithGoogle();
       if (outcome.kind !== "success") {
-        // "closed" is not an error worth alarming the user about.
-        if (outcome.kind === "closed") return { ok: false, message: "" };
         return { ok: false, message: outcome.message };
       }
       await api.setSession(outcome.userId, outcome.secret);

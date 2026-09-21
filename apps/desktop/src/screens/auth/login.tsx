@@ -65,7 +65,7 @@ export function LoginScreen() {
           className="h-10 min-w-60"
         >
           <GoogleIcon />
-          {signingIn ? "Waiting for Google sign-in…" : "Continue with Google"}
+          {signingIn ? "Waiting for browser sign-in…" : "Continue with Google"}
         </Button>
       ) : (
         <p className="max-w-sm rounded-lg bg-inset p-3 text-center text-[0.78rem] text-muted-foreground">
@@ -89,7 +89,8 @@ export function LoginScreen() {
 
       {signingIn && (
         <p className="text-[0.76rem] text-muted-foreground">
-          Complete sign-in in the Google window — you can close it afterwards.
+          Complete sign-in in your browser — you can close that tab
+          afterwards.
         </p>
       )}
     </main>
