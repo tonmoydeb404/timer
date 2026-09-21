@@ -64,3 +64,18 @@ export const staticRoutes: readonly SitePath[] = [
 
 export const siteUrl = (path: string = sitePaths.home): string =>
   `${externalUrls.site}${path}`;
+
+// ---------------------------------------------------------------------------
+// Authenticated product routes (nested under /dashboard)
+// ---------------------------------------------------------------------------
+
+export const appPaths = {
+  login: "/login",
+  callback: "/auth/callback",
+  dashboard: "/dashboard",
+  projects: "/dashboard/projects",
+  projectDetails: (projectId: string) => `/dashboard/projects/${projectId}`,
+  tasks: "/dashboard/tasks",
+  time: "/dashboard/time",
+  settings: "/dashboard/settings",
+} as const;

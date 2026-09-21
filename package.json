@@ -25,11 +25,13 @@
     "check-types": "turbo run check-types",
     "sync-brand": "node scripts/sync-brand.mjs",
     "sync-brand:check": "node scripts/sync-brand.mjs --check",
+    "provision:appwrite": "node scripts/provision-appwrite.mjs",
     "init-app": "node scripts/init-app.mjs",
     "release:tag": "node scripts/release-tag-sync.mjs",
     "prepare": "git config core.hooksPath .husky || true"
   },
   "devDependencies": {
+    "dotenv": "^18.0.1",
     "prettier": "^3.7.4",
     "turbo": "^2.10.9",
     "typescript": "5.9.2"

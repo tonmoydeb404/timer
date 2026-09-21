@@ -1,9 +1,8 @@
-import { SiteFooter, SiteHeader } from "@/components/layout";
 import { ThemeProvider } from "@/components/theme-provider";
-import { sitePaths } from "@/config/paths-config";
-import { SITE_URL, APP_NAME } from "@/content/homepage";
-import { externalUrls } from "@/config/paths-config";
+import { APP_NAME } from "@/content/homepage";
+import { externalUrls, sitePaths } from "@/config/paths-config";
 import { cn } from "@/lib/utils";
+import { AuthProvider } from "@/lib/auth-context";
 import type { Metadata } from "next";
 import { Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
@@ -21,9 +20,10 @@ const fontMono = IBM_Plex_Mono({
 });
 
 const title = `${APP_NAME} — ${externalUrls.descriptionShort}`;
+const siteUrl = externalUrls.site;
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(siteUrl),
   title,
   description: externalUrls.descriptionShort,
   alternates: {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    url: SITE_URL,
+    url: siteUrl,
     siteName: APP_NAME,
     title,
     description: externalUrls.descriptionShort,
@@ -69,9 +69,9 @@ export default function RootLayout({
       )}
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          <SiteHeader />
-          <div className="flex flex-1 flex-col">{children}</div>
-          <SiteFooter />
+          <AuthProvider>
+            <div className="flex flex-1 flex-col">{children}</div>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

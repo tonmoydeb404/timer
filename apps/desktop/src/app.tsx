@@ -6,6 +6,7 @@ import { Toaster } from "@packages/ui/components/sonner";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ModalProvider } from "./context/modal-context";
 import { AppProvider, useApp } from "./context/app-context";
+import { LoginScreen } from "./screens/auth/login";
 import { HomeScreen } from "./screens/home";
 
 function LoadingShell() {
@@ -39,10 +40,15 @@ function ErrorShell({ error }: { error: string }) {
 }
 
 function AppRoutes() {
-  const { loading, error } = useApp();
+  const { loading, error, auth } = useApp();
 
-  if (loading) return <LoadingShell />;
+  if (loading || auth === null) return <LoadingShell />;
   if (error) return <ErrorShell error={error} />;
+
+  // "unknown" means Appwrite was unreachable at boot — let the user into the
+  // shell (stored session may still be valid) instead of forcing a login.
+  const signedIn = auth.status === "active" || auth.status === "unknown";
+  if (!signedIn) return <LoginScreen />;
 
   return (
     <Routes>

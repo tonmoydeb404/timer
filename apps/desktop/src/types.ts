@@ -6,3 +6,33 @@ export type UpdateInfo = {
   body: string | null;
   date: string | null;
 };
+
+// ---- Auth (mirrors Rust appwrite.rs + packages/domain AuthState) ----
+
+export type AuthStatus = "signed_out" | "active" | "expired" | "unknown";
+
+export type AuthUser = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export type AuthState = {
+  configured: boolean;
+  status: AuthStatus;
+  user: AuthUser | null;
+};
+
+export type AuthConfig = {
+  endpoint: string;
+  project_configured: boolean;
+};
+
+export type OAuthPollStatus = "pending" | "success" | "closed" | "error";
+
+export type OAuthPoll = {
+  status: OAuthPollStatus;
+  user_id: string | null;
+  secret: string | null;
+  message: string | null;
+};

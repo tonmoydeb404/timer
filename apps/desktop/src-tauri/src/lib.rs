@@ -1,6 +1,7 @@
 use tauri::{image::Image, menu::MenuEvent, tray::TrayIconBuilder, Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
+mod appwrite;
 mod brand;
 mod commands;
 mod db;
@@ -113,7 +114,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::greet,
+            commands::get_auth_config,
+            commands::get_auth_state,
+            commands::set_session,
+            commands::sign_out,
+            commands::open_oauth_window,
+            commands::poll_oauth,
             commands::get_settings,
             commands::set_setting,
             commands::enable_autostart,

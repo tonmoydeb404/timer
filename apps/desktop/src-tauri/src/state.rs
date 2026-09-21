@@ -8,6 +8,7 @@ use rusqlite::Connection;
 #[allow(dead_code)]
 pub struct AppState {
     pub db: Mutex<Connection>,
+    pub http: reqwest::Client,
     pub app_data_dir: PathBuf,
 }
 
@@ -15,6 +16,7 @@ impl AppState {
     pub fn new(conn: Connection, app_data_dir: PathBuf) -> Self {
         AppState {
             db: Mutex::new(conn),
+            http: crate::appwrite::http_client(),
             app_data_dir,
         }
     }

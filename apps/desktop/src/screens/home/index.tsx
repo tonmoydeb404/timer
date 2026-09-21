@@ -1,79 +1,49 @@
 import { Button } from "@packages/ui/components/button";
-import { Input } from "@packages/ui/components/input";
-import { Sparkles } from "lucide-react";
-import { useState } from "react";
-import { api } from "@/lib/api";
-import { brand } from "@/lib/brand";
+import { LogOut, Timer } from "lucide-react";
+import { useApp } from "@/context/app-context";
 
-// Demo screen: a minimal invoke() round trip to the Rust `greet` command
-// (src-tauri/src/commands.rs). Replace with your app's real screens.
+// Phase 1 placeholder: proves auth + shell work. Real timer UI lands in
+// Phase 3; projects/tasks lists land in Phase 2.
 export function HomeScreen() {
-  const [name, setName] = useState("");
-  const [greeting, setGreeting] = useState<string | null>(null);
-
-  async function handleGreet() {
-    const result = await api.greet(name.trim() || "world");
-    setGreeting(result);
-  }
+  const { auth, signOut } = useApp();
+  const user = auth?.user;
+  const offline = auth?.status === "unknown";
 
   return (
     <section className="min-h-0 flex-1 overflow-auto scrollbar-thin p-6">
       <div className="mx-auto grid max-w-lg gap-6">
         <div className="grid gap-1 text-center">
-          <h1 className="text-xl font-[760] text-ink">
-            Welcome to {brand.appName}
-          </h1>
+          <h1 className="text-xl font-[760] text-ink">Today</h1>
           <p className="text-[0.82rem] text-muted-foreground">
-            This is a starter screen calling a Rust command via IPC.
+            {user ? `Tracking as ${user.name || user.email}` : "Today's work"}
           </p>
         </div>
 
-        <div className="grid gap-2 rounded-xl border border-border bg-surface p-4">
-          <div className="flex gap-2">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.currentTarget.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleGreet()}
-              placeholder="Your name…"
-              className="h-9"
-            />
-            <Button onClick={handleGreet} className="h-9">
-              <Sparkles size={14} />
-              Greet
-            </Button>
-          </div>
-          {greeting && (
-            <p className="rounded-lg bg-inset p-3 text-[0.82rem] text-muted-foreground">
-              {greeting}
-            </p>
-          )}
+        {offline && (
+          <p className="rounded-lg bg-inset p-3 text-center text-[0.78rem] text-muted-foreground">
+            Couldn&apos;t reach Appwrite — showing the last known session.
+          </p>
+        )}
+
+        <div className="grid justify-items-center gap-3 rounded-xl border border-border bg-surface p-8 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-inset text-muted-foreground">
+            <Timer size={22} />
+          </span>
+          <p className="text-[0.84rem] font-medium text-ink">No timer yet</p>
+          <p className="max-w-xs text-[0.78rem] text-muted-foreground">
+            Time tracking arrives in Phase 3. Projects and tasks arrive in
+            Phase 2.
+          </p>
         </div>
 
-        <div className="grid gap-2 rounded-xl border border-border bg-surface p-4 text-[0.78rem] leading-relaxed text-muted-foreground">
-          <strong className="text-[0.82rem] text-ink">Where to go next</strong>
-          <span>
-            IPC commands:{" "}
-            <code className="rounded bg-inset px-1 py-0.5">
-              src-tauri/src/commands.rs
-            </code>{" "}
-            +{" "}
-            <code className="rounded bg-inset px-1 py-0.5">src/lib/api.ts</code>
-          </span>
-          <span>
-            Database:{" "}
-            <code className="rounded bg-inset px-1 py-0.5">
-              src-tauri/src/db.rs
-            </code>{" "}
-            + migrations in{" "}
-            <code className="rounded bg-inset px-1 py-0.5">
-              src-tauri/src/migrations/sql/
-            </code>
-          </span>
-          <span>
-            Screens: <code className="rounded bg-inset px-1 py-0.5">src/screens/</code>{" "}
-            · routes in <code className="rounded bg-inset px-1 py-0.5">src/app.tsx</code>
-          </span>
-        </div>
+        <Button
+          variant="ghost"
+          onClick={signOut}
+          className="mx-auto h-8 text-muted-foreground"
+        >
+          <LogOut size={14} />
+          Sign out
+        </Button>
       </div>
     </section>
   );

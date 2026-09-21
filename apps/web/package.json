@@ -12,7 +12,9 @@
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@packages/ui": "workspace:*",
+    "@packages/domain": "workspace:*",
     "@tabler/icons-react": "^3.44.0",
+    "appwrite": "^27.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.23.0",

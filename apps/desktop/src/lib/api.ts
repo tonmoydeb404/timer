@@ -1,13 +1,30 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { UpdateInfo } from "../types";
+import type {
+  AuthConfig,
+  AuthState,
+  AuthUser,
+  OAuthPoll,
+  UpdateInfo,
+} from "../types";
 
 // All IPC wrappers live here — one entry per Rust command in
 // src-tauri/src/commands.rs.
 
 export const api = {
-  // Demo command — replace with your app's real commands.
-  greet: (name: string) => invoke<string>("greet", { name }),
+  getAuthConfig: () => invoke<AuthConfig>("get_auth_config"),
+  getAuthState: () => invoke<AuthState>("get_auth_state"),
+  setSession: (userId: string, secret: string) =>
+    invoke<AuthUser>("set_session", { userId, secret }),
+  signOut: () => invoke<void>("sign_out"),
+
+  openOAuthWindow: (successUrl: string, failureUrl: string) =>
+    invoke<void>("open_oauth_window", {
+      successUrl,
+      failureUrl,
+    }),
+  pollOAuth: (successUrl: string, failureUrl: string) =>
+    invoke<OAuthPoll>("poll_oauth", { successUrl, failureUrl }),
 
   getSettings: () => invoke<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>
