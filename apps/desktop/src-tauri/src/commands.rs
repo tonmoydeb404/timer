@@ -60,7 +60,7 @@ pub async fn get_auth_state(app: AppHandle) -> Result<AuthState, String> {
             status: AuthStatus::Active,
             user: Some(user),
         }),
-        Err(AppwriteError::Unauthorized) => {
+        Err(AppwriteError::Unauthorized(_)) => {
             // Session is dead server-side; drop it locally.
             let conn = state.db.lock().map_err(map_err)?;
             appwrite::clear_session(&conn).map_err(map_err)?;

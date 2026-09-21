@@ -115,7 +115,7 @@ pub struct AuthConfig {
 #[derive(Debug)]
 pub enum AppwriteError {
     NotConfigured,
-    Unauthorized,
+    Unauthorized(String),
     Network(String),
     Server(u16, String),
     Unexpected(String),
@@ -128,8 +128,8 @@ impl fmt::Display for AppwriteError {
                 f,
                 "not_configured: APPWRITE_ENDPOINT/APPWRITE_PROJECT_ID missing at build time"
             ),
-            AppwriteError::Unauthorized => {
-                write!(f, "unauthorized: session expired or invalid")
+            AppwriteError::Unauthorized(detail) => {
+                write!(f, "unauthorized: {detail}")
             }
             AppwriteError::Network(detail) => write!(f, "network: {detail}"),
             AppwriteError::Server(status, detail) => {
@@ -182,14 +182,18 @@ fn headers(project: &str, session_secret: Option<&str>) -> HeaderMap {
     headers
 }
 
-fn status_error(status: reqwest::StatusCode, body: &str) -> AppwriteError {
-    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
-        return AppwriteError::Unauthorized;
-    }
-    // Try to surface Appwrite's own message: {"message": "..."}.
-    let detail = serde_json::from_str::<serde_json::Value>(body)
-        .ok()
-        .and_then(|v| v.get("message")?.as_str().map(str::to_string))
+fn status_error(
+    method: &str,
+    path: &str,
+    status: reqwest::StatusCode,
+    body: &str,
+) -> AppwriteError {
+    // Surface Appwrite's own shape: {"message": "...", "type": "..."}.
+    let parsed = serde_json::from_str::<serde_json::Value>(body).ok();
+    let message = parsed
+        .as_ref()
+        .and_then(|v| v.get("message")?.as_str())
+        .map(str::to_string)
         .unwrap_or_else(|| {
             body.chars()
                 .take(300)
@@ -197,6 +201,14 @@ fn status_error(status: reqwest::StatusCode, body: &str) -> AppwriteError {
                 .trim()
                 .to_string()
         });
+    let kind = parsed
+        .as_ref()
+        .and_then(|v| v.get("type")?.as_str())
+        .unwrap_or("unknown");
+    let detail = format!("{method} {path} → {} {kind}: {message}", status.as_u16());
+    if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+        return AppwriteError::Unauthorized(detail);
+    }
     AppwriteError::Server(status.as_u16(), detail)
 }
 
@@ -237,7 +249,12 @@ pub async fn create_session(
     let status = res.status();
     let body = res.text().await?;
     if !status.is_success() {
-        return Err(status_error(status, &body));
+        return Err(status_error(
+            "POST",
+            "/account/sessions/token",
+            status,
+            &body,
+        ));
     }
     let session: SessionResponse =
         serde_json::from_str(&body).map_err(|e| AppwriteError::Unexpected(e.to_string()))?;
@@ -263,7 +280,7 @@ pub async fn get_account(
     let status = res.status();
     let body = res.text().await?;
     if !status.is_success() {
-        return Err(status_error(status, &body));
+        return Err(status_error("GET", "/account", status, &body));
     }
     let account: AccountResponse =
         serde_json::from_str(&body).map_err(|e| AppwriteError::Unexpected(e.to_string()))?;
@@ -290,7 +307,12 @@ pub async fn delete_current_session(
         return Ok(());
     }
     let body = res.text().await.unwrap_or_default();
-    Err(status_error(status, &body))
+    Err(status_error(
+        "DELETE",
+        "/account/sessions/current",
+        status,
+        &body,
+    ))
 }
 
 // ---- Stored session (settings key-value store) ----
@@ -344,7 +366,7 @@ pub struct Session {
 pub fn require_session(conn: &rusqlite::Connection) -> Result<Session, AppwriteError> {
     match load_session(conn) {
         (Some(secret), Some(user_id)) => Ok(Session { user_id, secret }),
-        _ => Err(AppwriteError::Unauthorized),
+        _ => Err(AppwriteError::Unauthorized("not signed in".to_string())),
     }
 }
 
@@ -391,7 +413,8 @@ pub async fn list_documents(
     let status = res.status();
     let body = res.text().await?;
     if !status.is_success() {
-        return Err(status_error(status, &body));
+        let path = format!("/tablesdb/{DATABASE_ID}/tables/{collection}/rows");
+        return Err(status_error("GET", &path, status, &body));
     }
     let parsed: serde_json::Value =
         serde_json::from_str(&body).map_err(|e| AppwriteError::Unexpected(e.to_string()))?;
@@ -433,7 +456,8 @@ pub async fn create_document(
     let status = res.status();
     let body = res.text().await?;
     if !status.is_success() {
-        return Err(status_error(status, &body));
+        let path = format!("/tablesdb/{DATABASE_ID}/tables/{collection}/rows");
+        return Err(status_error("POST", &path, status, &body));
     }
     serde_json::from_str(&body).map_err(|e| AppwriteError::Unexpected(e.to_string()))
 }
