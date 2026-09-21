@@ -1,30 +1,26 @@
-import { AppSidebar } from "@/components/app-sidebar";
-import { ListSkeleton } from "@/components/list-skeleton";
-import { AppLayout } from "@/layouts/app-layout";
-import { SidebarInset, SidebarProvider } from "@packages/ui/components/sidebar";
+import { Skeleton } from "@packages/ui/components/skeleton";
 import { Toaster } from "@packages/ui/components/sonner";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ModalProvider } from "./context/modal-context";
 import { AppProvider, useApp } from "./context/app-context";
+import { TabLayout } from "./layouts/tab-layout";
 import { LoginScreen } from "./screens/auth/login";
-import { HomeScreen } from "./screens/home";
+import { HistoryScreen } from "./screens/history";
+import { SettingsScreen } from "./screens/settings";
+import { TasksScreen } from "./screens/tasks";
+import { TodayScreen } from "./screens/today";
 
 function LoadingShell() {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="overflow-hidden">
-        <div
-          data-tauri-drag-region
-          className="h-9 shrink-0 border-b border-border"
-        />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <section className="min-h-0 flex-1 overflow-auto scrollbar-thin p-4">
-            <ListSkeleton />
-          </section>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <main className="flex h-svh w-screen flex-col overflow-hidden bg-background">
+      <div className="h-14 shrink-0 border-b border-border" />
+      <div className="mx-auto grid w-full max-w-[420px] flex-1 gap-2 overflow-hidden px-3.5 pt-4">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-44 w-full rounded-xl" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+      </div>
+      <div className="h-14 shrink-0 border-t border-border" />
+    </main>
   );
 }
 
@@ -52,8 +48,11 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route element={<AppLayout />}>
-        <Route index element={<HomeScreen />} />
+      <Route element={<TabLayout />}>
+        <Route index element={<TodayScreen />} />
+        <Route path="tasks" element={<TasksScreen />} />
+        <Route path="history" element={<HistoryScreen />} />
+        <Route path="settings" element={<SettingsScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
