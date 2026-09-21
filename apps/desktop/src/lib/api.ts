@@ -15,6 +15,8 @@ import type {
 
 export const api = {
   getAuthConfig: () => invoke<AuthConfig>("get_auth_config"),
+  setAuthConfig: (endpoint: string, projectId: string) =>
+    invoke<void>("set_auth_config", { endpoint, projectId }),
   getAuthState: () => invoke<AuthState>("get_auth_state"),
   setSession: (userId: string, secret: string) =>
     invoke<AuthUser>("set_session", { userId, secret }),

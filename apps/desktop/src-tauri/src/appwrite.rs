@@ -17,9 +17,49 @@ const RESPONSE_FORMAT: &str = "2.0.0";
 const SESSION_SECRET_KEY: &str = "appwrite.session_secret";
 const SESSION_USER_KEY: &str = "appwrite.user_id";
 
-// ---- Build-time configuration (export APPWRITE_* when building) ----
+// ---- Configuration: compile-time env with a runtime override ----
+
+/// The endpoint/project ID are public by design. They can be baked at
+/// compile time (APPWRITE_* env) but the frontend also pushes them at boot
+/// from its own `.env`, so a plain `pnpm dev` works with zero exports.
+#[derive(Debug, Clone)]
+pub struct RuntimeConfig {
+    pub endpoint: String,
+    pub project_id: String,
+}
+
+static RUNTIME_CONFIG: std::sync::OnceLock<std::sync::Mutex<Option<RuntimeConfig>>> =
+    std::sync::OnceLock::new();
+
+fn runtime_config() -> Option<RuntimeConfig> {
+    RUNTIME_CONFIG
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
+}
+
+pub fn set_runtime_config(endpoint: String, project_id: String) {
+    if let Ok(mut guard) = RUNTIME_CONFIG
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+    {
+        let project_id = project_id.trim().to_string();
+        *guard = if project_id.is_empty() {
+            None
+        } else {
+            Some(RuntimeConfig {
+                endpoint: endpoint.trim_end_matches('/').to_string(),
+                project_id,
+            })
+        };
+    }
+}
 
 pub fn endpoint() -> String {
+    if let Some(config) = runtime_config() {
+        return config.endpoint;
+    }
     option_env!("APPWRITE_ENDPOINT")
         .unwrap_or(DEFAULT_ENDPOINT)
         .trim_end_matches('/')
@@ -27,6 +67,9 @@ pub fn endpoint() -> String {
 }
 
 pub fn project_id() -> Option<String> {
+    if let Some(config) = runtime_config() {
+        return Some(config.project_id);
+    }
     option_env!("APPWRITE_PROJECT_ID")
         .map(str::to_string)
         .filter(|s| !s.trim().is_empty())

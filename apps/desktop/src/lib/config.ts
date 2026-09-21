@@ -9,6 +9,13 @@ function requiredEnv(name: string, fallback: string): string {
   return value && value.trim().length > 0 ? value : fallback;
 }
 
+export const appwriteEndpoint = requiredEnv(
+  "VITE_APPWRITE_ENDPOINT",
+  "https://cloud.appwrite.io/v1",
+);
+
+export const appwriteProjectId = requiredEnv("VITE_APPWRITE_PROJECT_ID", "");
+
 export const webUrl = requiredEnv(
   "VITE_WEB_URL",
   "http://localhost:3010",

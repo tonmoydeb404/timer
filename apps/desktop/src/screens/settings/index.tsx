@@ -1,6 +1,6 @@
 import { Button } from "@packages/ui/components/button";
 import { Switch } from "@packages/ui/components/switch";
-import { ExternalLink, LogOut, Moon, Rocket } from "lucide-react";
+import { ExternalLink, LogIn, LogOut, Moon, Rocket } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -64,7 +64,7 @@ function Row({
 // Settings tab: appearance, system, account, about. Mirrors the desktop
 // settings dialog content inline for the popup layout.
 export function SettingsScreen() {
-  const { auth, signOut } = useApp();
+  const { auth, signIn, signOut, signingIn } = useApp();
   const { theme, setTheme } = useTheme();
   const [autostart, setAutostart] = useState(false);
 
@@ -129,23 +129,48 @@ export function SettingsScreen() {
 
       <Section title="Account">
         <div className="grid gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
-          <span className="truncate text-xs font-semibold text-ink">
-            {auth?.user?.name || auth?.user?.email}
-          </span>
-          {auth?.user?.name && (
-            <span className="truncate text-[11px] text-muted-foreground">
-              {auth?.user?.email}
-            </span>
+          {auth?.status === "active" && auth.user ? (
+            <>
+              <span className="truncate text-xs font-semibold text-ink">
+                {auth.user.name || auth.user.email}
+              </span>
+              {auth.user.name && (
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {auth.user.email}
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void signOut()}
+                className="mt-1 w-fit text-muted-foreground"
+              >
+                <LogOut size={14} />
+                Sign out
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="text-[11px] text-muted-foreground">
+                {auth?.status === "unknown"
+                  ? "Couldn't reach Appwrite."
+                  : "You're signed out."}
+              </span>
+              <Button
+                size="sm"
+                onClick={() =>
+                  void signIn().then((r) => {
+                    if (!r.ok && r.message) toast.error(r.message);
+                  })
+                }
+                disabled={signingIn}
+                className="mt-1 w-fit"
+              >
+                <LogIn size={14} />
+                {signingIn ? "Waiting for Google…" : "Sign in with Google"}
+              </Button>
+            </>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void signOut()}
-            className="mt-1 w-fit text-muted-foreground"
-          >
-            <LogOut size={14} />
-            Sign out
-          </Button>
         </div>
       </Section>
 

@@ -153,6 +153,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_auth_config,
+            commands::set_auth_config,
             commands::get_auth_state,
             commands::set_session,
             commands::sign_out,

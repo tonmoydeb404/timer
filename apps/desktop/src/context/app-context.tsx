@@ -8,6 +8,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { api, onUpdateAvailable } from "../lib/api";
+import { appwriteEndpoint, appwriteProjectId } from "../lib/config";
 import { signInWithGoogle } from "../lib/oauth";
 import type { AuthState, UpdateInfo } from "../types";
 
@@ -58,6 +59,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     async function load() {
       try {
+        // Hand Rust its Appwrite config first: the frontend's `.env` is the
+        // single source, so no shell exports are needed to run or build.
+        await api.setAuthConfig(appwriteEndpoint, appwriteProjectId);
         const backendSettings = await api.getSettings();
         if (cancelled) return;
         setSettings(backendSettings);

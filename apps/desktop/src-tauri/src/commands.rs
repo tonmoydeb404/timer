@@ -11,6 +11,14 @@ fn map_err<E: std::fmt::Display>(e: E) -> String {
 
 // ---- Auth (Appwrite user session) ----
 
+/// Receives the Appwrite endpoint/project from the frontend at boot (it
+/// reads them from its `.env`). Overrides compile-time values when set.
+#[tauri::command]
+pub async fn set_auth_config(endpoint: String, project_id: String) -> Result<(), String> {
+    appwrite::set_runtime_config(endpoint, project_id);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn get_auth_config() -> Result<AuthConfig, String> {
     Ok(AuthConfig {

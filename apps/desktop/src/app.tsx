@@ -42,9 +42,11 @@ function AppRoutes() {
   if (loading || auth === null) return <LoadingShell />;
   if (error) return <ErrorShell error={error} />;
 
-  // "unknown" means Appwrite was unreachable at boot — let the user into the
-  // shell (stored session may still be valid) instead of forcing a login.
-  const signedIn = auth.status === "active" || auth.status === "unknown";
+  // "unknown" with a configured backend means Appwrite was unreachable at
+  // boot — let the user into the shell (stored session may still be valid).
+  // "unknown" without config is a broken build: show login's setup message.
+  const signedIn =
+    auth.status === "active" || (auth.status === "unknown" && auth.configured);
   if (!signedIn) return <LoginScreen />;
 
   return (
