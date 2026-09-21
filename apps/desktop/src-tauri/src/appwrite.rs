@@ -2,13 +2,14 @@
 //!
 //! The desktop talks to Appwrite directly (cloud-first MVP): no local mirror,
 //! no sync engine. Auth is a user session persisted in the settings store;
-//! every request carries `X-Appwrite-Project` plus the session cookie
-//! `a_session_<projectId>`. Shapes mirror `packages/domain` (TypeScript).
+//! every request carries `X-Appwrite-Project` plus `X-Appwrite-Session`
+//! (the server SDKs' session mechanism — raw Cookie headers only work in
+//! browsers). Shapes mirror `packages/domain` (TypeScript).
 
 use std::fmt;
 use std::time::Duration;
 
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE, COOKIE};
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_ENDPOINT: &str = "https://cloud.appwrite.io/v1";
@@ -73,10 +74,6 @@ pub fn project_id() -> Option<String> {
     option_env!("APPWRITE_PROJECT_ID")
         .map(str::to_string)
         .filter(|s| !s.trim().is_empty())
-}
-
-pub fn session_cookie_name(project: &str) -> String {
-    format!("a_session_{project}")
 }
 
 // ---- Serializable state (mirrors packages/domain AuthState) ----
@@ -173,10 +170,12 @@ fn headers(project: &str, session_secret: Option<&str>) -> HeaderMap {
     );
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    // Programmatic clients authenticate the user session with
+    // X-Appwrite-Session (mirrors the server SDKs' `setSession`); raw
+    // Cookie headers are not accepted outside browsers.
     if let Some(secret) = session_secret {
-        let cookie = format!("{}={}", session_cookie_name(project), secret);
-        if let Ok(value) = HeaderValue::from_str(&cookie) {
-            headers.insert(COOKIE, value);
+        if let Ok(value) = HeaderValue::from_str(secret) {
+            headers.insert("X-Appwrite-Session", value);
         }
     }
     headers
