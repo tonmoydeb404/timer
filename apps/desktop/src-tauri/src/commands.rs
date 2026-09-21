@@ -188,6 +188,7 @@ async fn mutate_timer(
 
     let view = crate::timer::view(&store, crate::timer::now_ms());
     let _ = app.emit("timer://changed", &view);
+    crate::tray::rebuild_menu(app);
     Ok(view)
 }
 

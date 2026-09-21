@@ -71,3 +71,7 @@ export function onTimerChanged(
     callback(event.payload),
   );
 }
+
+export function onOpenSwitcher(callback: () => void): Promise<UnlistenFn> {
+  return listen("timer://open-switcher", () => callback());
+}

@@ -1,6 +1,7 @@
 import { Badge } from "@packages/ui/components/badge";
 import { Button } from "@packages/ui/components/button";
 import { DataState } from "@packages/ui/components/data-state";
+import { Input } from "@packages/ui/components/input";
 import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import {
   Select,
@@ -17,15 +18,18 @@ import {
   CloudCheck,
   CloudOff,
   Coffee,
+  ListPlus,
   NotebookPen,
   Pause,
   Play,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { formatDuration, formatDurationShort } from "@packages/domain/time";
 import { useApp } from "@/context/app-context";
 import { useTimer } from "@/context/timer-context";
 import { useTasks } from "@/hooks/use-tasks";
+import { api, onOpenSwitcher } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 // Today tab: project strip, live timer card, summaries, task queue.
@@ -47,11 +51,21 @@ export function TodayScreen() {
   } = useTimer();
   const [projectFilter, setProjectFilter] = useState("ALL");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuickTitle, setPickerQuickTitle] = useState("");
+  const [pickerAdding, setPickerAdding] = useState(false);
   const [, setTick] = useState(0);
 
   const online = auth?.status === "active";
   const status = view?.status ?? "IDLE";
   const running = status !== "IDLE";
+
+  // Tray "Switch Task" opens this picker's sheet.
+  useEffect(() => {
+    const unlisten = onOpenSwitcher(() => setPickerOpen(true));
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
 
   // Tick the display while a session is open.
   useEffect(() => {
@@ -113,6 +127,27 @@ export function TodayScreen() {
       setFocusId(taskId);
     } else if (taskId !== runningTaskId) {
       void switchTo(taskId, taskTitle);
+    }
+  }
+
+  const runningProjectId =
+    tasks.find((t) => t.$id === runningTaskId)?.projectId ?? null;
+
+  async function handlePickerQuickAdd() {
+    const title = pickerQuickTitle.trim();
+    if (!title || !runningProjectId || pickerAdding) return;
+    setPickerAdding(true);
+    try {
+      const created = await api.createTask(runningProjectId, title);
+      setPickerQuickTitle("");
+      setPickerOpen(false);
+      await switchTo(created.$id, created.title);
+    } catch (err) {
+      toast.error("Quick-add failed", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setPickerAdding(false);
     }
   }
 
@@ -465,6 +500,25 @@ export function TodayScreen() {
           </Button>
         }
       >
+        <div className="flex gap-2">
+          <Input
+            value={pickerQuickTitle}
+            onChange={(e) => setPickerQuickTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void handlePickerQuickAdd()}
+            placeholder={`Quick-add in ${projects.find((p) => p.$id === runningProjectId)?.name ?? "current project"}…`}
+            className="h-9"
+          />
+          <Button
+            onClick={() => void handlePickerQuickAdd()}
+            disabled={
+              pickerAdding || !pickerQuickTitle.trim() || !runningProjectId
+            }
+            className="h-9 shrink-0"
+          >
+            <ListPlus size={14} />
+            Add
+          </Button>
+        </div>
         <ul className="grid max-h-80 gap-2 overflow-y-auto scrollbar-thin">
           {visible
             .filter((t) => t.$id !== runningTaskId)

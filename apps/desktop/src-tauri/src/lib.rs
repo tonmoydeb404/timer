@@ -122,6 +122,19 @@ pub fn run() {
                 check_for_update(updater_handle).await;
             });
 
+            // Refresh the tray's elapsed readout while a session is open.
+            let tick_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                    let state = tick_handle.state::<AppState>();
+                    let store = timer::load(&state.app_data_dir);
+                    if store.active.is_some() {
+                        tray::rebuild_menu(&tick_handle);
+                    }
+                }
+            });
+
             // not a template: renders full color with the app icon's own background,
             // rather than a floating transparent glyph
             let _tray = TrayIconBuilder::with_id("main_tray")
