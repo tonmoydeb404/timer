@@ -1,4 +1,5 @@
 import { Button } from "@packages/ui/components/button";
+import { Input } from "@packages/ui/components/input";
 import { Timer } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/context/app-context";
@@ -28,8 +29,10 @@ function GoogleIcon() {
 }
 
 export function LoginScreen() {
-  const { auth, signingIn, signIn } = useApp();
+  const { auth, signingIn, signIn, completeSignInWithUrl } = useApp();
   const [message, setMessage] = useState<string | null>(null);
+  const [link, setLink] = useState("");
+  const [showPaste, setShowPaste] = useState(false);
 
   const configured = auth?.configured ?? true;
   const expired = auth?.status === "expired";
@@ -39,6 +42,16 @@ export function LoginScreen() {
     const result = await signIn();
     if (!result.ok && result.message) {
       setMessage(result.message);
+    }
+  }
+
+  async function handlePasteLink() {
+    setMessage(null);
+    const result = await completeSignInWithUrl(link);
+    if (!result.ok && result.message) {
+      setMessage(result.message);
+    } else {
+      setLink("");
     }
   }
 
@@ -96,6 +109,57 @@ export function LoginScreen() {
           You&apos;ll approve in your browser, then land back here
           automatically.
         </p>
+      )}
+
+      {configured && !showPaste && (
+        <button
+          type="button"
+          onClick={() => setShowPaste(true)}
+          className="text-[0.76rem] text-muted-foreground underline-offset-2 hover:text-ink hover:underline"
+        >
+          App didn&apos;t reopen? Paste the sign-in link instead
+        </button>
+      )}
+
+      {configured && showPaste && (
+        <div className="grid w-full max-w-sm gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
+          <p className="text-[0.76rem] text-muted-foreground">
+            Copy the link from your browser&apos;s address bar (it carries the
+            sign-in code) and paste it here.
+          </p>
+          <Input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && link.trim() && !signingIn) {
+                void handlePasteLink();
+              }
+            }}
+            placeholder="timer://auth?userId=…&secret=…"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label="Sign-in link"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowPaste(false);
+                setLink("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handlePasteLink}
+              disabled={signingIn || !link.trim()}
+            >
+              {signingIn ? "Signing in…" : "Sign in with link"}
+            </Button>
+          </div>
+        </div>
       )}
     </main>
   );

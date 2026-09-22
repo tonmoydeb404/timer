@@ -27,6 +27,13 @@ type AppContextValue = {
   auth: AuthState | null;
   signingIn: boolean;
   signIn: () => Promise<SignInResult>;
+  /**
+   * Dev fallback: paste the sign-in link (the `timer://auth?...` deep link
+   * or the `/auth/desktop?...` bridge URL) when the OS can't route the
+   * scheme back to an uninstalled dev binary. Parses userId+secret out of
+   * any pasted URL and creates the session.
+   */
+  completeSignInWithUrl: (raw: string) => Promise<SignInResult>;
   signOut: () => Promise<void>;
   refreshAuth: () => Promise<void>;
 
@@ -75,44 +82,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Core of every OAuth completion: pull userId+secret out of any URL that
+  // carries them (deep link or https bridge URL) and create the session.
+  const completeAuthUrl = useCallback(
+    async (raw: string): Promise<SignInResult> => {
+      let userId: string | null = null;
+      let secret: string | null = null;
+      try {
+        const parsed = new URL(raw.trim());
+        userId = parsed.searchParams.get("userId");
+        secret = parsed.searchParams.get("secret");
+      } catch {
+        return { ok: false, message: "That link couldn't be read as a URL." };
+      }
+      if (!userId || !secret) {
+        return { ok: false, message: "Google sign-in failed or was cancelled." };
+      }
+      const account = getAccount();
+      if (!account) {
+        return { ok: false, message: "Appwrite is not configured." };
+      }
+      try {
+        await account.createSession({ userId, secret });
+        await refreshAuth();
+        return { ok: true };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+    [refreshAuth],
+  );
+
   const handleAuthUrls = useCallback(
     async (urls: string[]) => {
       for (const raw of urls) {
         if (!raw.startsWith(OAUTH_CALLBACK_URL)) continue;
-        let userId: string | null = null;
-        let secret: string | null = null;
-        try {
-          const parsed = new URL(raw);
-          userId = parsed.searchParams.get("userId");
-          secret = parsed.searchParams.get("secret");
-        } catch {
-          continue;
-        }
-        if (!userId || !secret) {
-          toast.error("Google sign-in failed or was cancelled.");
-          setSigningIn(false);
-          continue;
-        }
-        const account = getAccount();
-        if (!account) {
-          toast.error("Appwrite is not configured.");
-          setSigningIn(false);
-          continue;
-        }
-        try {
-          await account.createSession({ userId, secret });
-          await refreshAuth();
+        const result = await completeAuthUrl(raw);
+        if (result.ok) {
           toast.success("Signed in.");
-        } catch (err) {
+        } else if (
+          result.message === "Google sign-in failed or was cancelled."
+        ) {
+          toast.error(result.message);
+        } else {
           toast.error("Couldn't finish sign-in.", {
-            description: err instanceof Error ? err.message : String(err),
+            description: result.message,
           });
-        } finally {
-          setSigningIn(false);
         }
+        setSigningIn(false);
       }
     },
-    [refreshAuth],
+    [completeAuthUrl],
+  );
+
+  const completeSignInWithUrl = useCallback(
+    async (raw: string): Promise<SignInResult> => {
+      setSigningIn(true);
+      try {
+        const result = await completeAuthUrl(raw);
+        if (result.ok) toast.success("Signed in.");
+        return result;
+      } finally {
+        setSigningIn(false);
+      }
+    },
+    [completeAuthUrl],
   );
 
   // ---- Data loading ----
@@ -227,6 +264,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     auth,
     signingIn,
     signIn,
+    completeSignInWithUrl,
     signOut,
     refreshAuth,
     settings,

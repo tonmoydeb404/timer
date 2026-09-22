@@ -25,11 +25,18 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { formatDuration, formatDurationShort } from "@packages/domain/time";
+import {
+  aggregateDayTotals,
+  formatDuration,
+  formatDurationShort,
+  lastNDayKeys,
+  sumDayTotals,
+} from "@packages/domain/index";
 import { useApp } from "@/context/app-context";
 import { useTimer } from "@/context/timer-context";
 import { useTasks } from "@/hooks/use-tasks";
 import { onOpenSwitcher } from "@/lib/api";
+import { getProfile, listTimeEntries } from "@/lib/db";
 import { cn } from "@/lib/utils";
 
 // Today tab: project strip, live timer card, summaries, task queue.
@@ -54,6 +61,8 @@ export function TodayScreen() {
   const [pickerQuickTitle, setPickerQuickTitle] = useState("");
   const [pickerAdding, setPickerAdding] = useState(false);
   const [, setTick] = useState(0);
+  const [weekWorkMs, setWeekWorkMs] = useState(0);
+  const [weekBreakMs, setWeekBreakMs] = useState(0);
 
   const online = auth?.status === "active";
   const status = view?.status ?? "IDLE";
@@ -73,6 +82,41 @@ export function TodayScreen() {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [running]);
+
+  // Weekly totals from synced entries (midnight-split in the profile zone).
+  const userId = auth?.user?.id ?? null;
+  useEffect(() => {
+    if (!userId) {
+      setWeekWorkMs(0);
+      setWeekBreakMs(0);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [profile, entries] = await Promise.all([
+          getProfile(userId),
+          listTimeEntries(userId, 500),
+        ]);
+        if (cancelled) return;
+        const tz =
+          profile?.timezone ??
+          Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const perDay = aggregateDayTotals(entries, tz);
+        const last7 = new Set(lastNDayKeys(tz, 7));
+        const { workMs, breakMs } = sumDayTotals(
+          perDay.filter((d) => last7.has(d.day)),
+        );
+        setWeekWorkMs(workMs);
+        setWeekBreakMs(breakMs);
+      } catch {
+        // Weekly card keeps its last value when offline.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, view?.pending_count]);
 
   const visible = useMemo(
     () =>
@@ -353,10 +397,12 @@ export function TodayScreen() {
             />
           </div>
           <span className="font-mono text-xl font-bold tabular-nums text-ink">
-            {formatDurationShort(0)}
+            {formatDurationShort(weekWorkMs)}
           </span>
           <span className="mt-1 font-mono text-[10px] text-muted-foreground">
-            Weekly totals in Phase 5
+            {weekWorkMs > 0 || weekBreakMs > 0
+              ? `${formatDurationShort(weekBreakMs)} rest this week`
+              : "No time this week yet"}
           </span>
         </div>
       </div>

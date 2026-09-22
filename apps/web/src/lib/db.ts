@@ -1,12 +1,14 @@
 import {
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
+  type EntryType,
   type Profile,
   type Project,
   type ProjectStatus,
   type Task,
   type TaskPriority,
   type TaskStatus,
+  type TimeEntry,
 } from "@packages/domain/index";
 import { Databases, ID, Permission, Query, Role, Client } from "appwrite";
 import type { Models } from "appwrite";
@@ -90,6 +92,20 @@ export function toProfile(doc: Doc): Profile {
   };
 }
 
+export function toTimeEntry(doc: Doc): TimeEntry {
+  return {
+    $id: doc.$id,
+    $createdAt: doc.$createdAt,
+    $updatedAt: doc.$updatedAt,
+    $permissions: doc.$permissions,
+    userId: String(doc.userId ?? ""),
+    taskId: String(doc.taskId ?? ""),
+    type: (doc.type as EntryType) ?? "WORK",
+    startedAt: String(doc.startedAt ?? ""),
+    endedAt: str(doc.endedAt),
+  };
+}
+
 const DB = APPWRITE_DATABASE_ID;
 const NOT_DELETED = Query.isNull("deletedAt");
 const byUser = (userId: string) => Query.equal("userId", userId);
@@ -136,13 +152,14 @@ export type ProjectInput = {
 export async function listProjects(
   userId: string,
   includeArchived = true,
+  includeDeleted = false,
 ): Promise<Project[]> {
   const queries = [
     byUser(userId),
-    NOT_DELETED,
     Query.orderDesc("$updatedAt"),
     Query.limit(100),
   ];
+  if (!includeDeleted) queries.push(NOT_DELETED);
   if (!includeArchived) queries.push(Query.equal("status", "ACTIVE"));
   const res = await requireDatabases().listDocuments(
     DB,
@@ -240,14 +257,18 @@ export type TaskInput = {
 
 export async function listTasks(
   userId: string,
-  opts: { projectId?: string; status?: TaskStatus } = {},
+  opts: {
+    projectId?: string;
+    status?: TaskStatus;
+    includeDeleted?: boolean;
+  } = {},
 ): Promise<Task[]> {
   const queries = [
     byUser(userId),
-    NOT_DELETED,
     Query.orderDesc("$updatedAt"),
     Query.limit(200),
   ];
+  if (!opts.includeDeleted) queries.push(NOT_DELETED);
   if (opts.projectId) queries.push(Query.equal("projectId", opts.projectId));
   if (opts.status) queries.push(Query.equal("status", opts.status));
   const res = await requireDatabases().listDocuments(
@@ -314,6 +335,172 @@ export async function deleteTask(taskId: string): Promise<void> {
   await requireDatabases().updateDocument(DB, COLLECTIONS.tasks, taskId, {
     deletedAt: new Date().toISOString(),
   });
+}
+
+export async function getTask(taskId: string): Promise<Task | null> {
+  try {
+    const doc = (await requireDatabases().getDocument(
+      DB,
+      COLLECTIONS.tasks,
+      taskId,
+    )) as unknown as Doc;
+    return toTask(doc);
+  } catch {
+    return null;
+  }
+}
+
+// ---- Time entries (Phase 5) ----
+
+export type TimeEntryInput = {
+  taskId: string;
+  type?: EntryType;
+  startedAt: string;
+  endedAt: string | null;
+};
+
+function validateEntryRange(startedAt: string, endedAt: string | null): void {
+  const start = new Date(startedAt).getTime();
+  if (!Number.isFinite(start)) throw new Error("Start time is invalid.");
+  if (endedAt !== null) {
+    const end = new Date(endedAt).getTime();
+    if (!Number.isFinite(end)) throw new Error("End time is invalid.");
+    if (end <= start) throw new Error("End must be after start.");
+  }
+}
+
+export async function listTimeEntries(
+  userId: string,
+  opts: {
+    taskId?: string;
+    taskIds?: string[];
+    type?: EntryType;
+    /** ISO lower bound (inclusive) on startedAt. */
+    from?: string;
+    /** ISO upper bound (exclusive) on startedAt. */
+    to?: string;
+    limit?: number;
+  } = {},
+): Promise<TimeEntry[]> {
+  const queries = [
+    byUser(userId),
+    Query.orderDesc("startedAt"),
+    Query.limit(Math.min(Math.max(opts.limit ?? 200, 1), 500)),
+  ];
+  // NB: Appwrite combines equality filters with AND; multiple taskIds need
+  // separate queries, so fetch per-task only when a small set is given.
+  if (opts.taskId) queries.push(Query.equal("taskId", opts.taskId));
+  if (opts.type) queries.push(Query.equal("type", opts.type));
+  if (opts.from) queries.push(Query.greaterThanEqual("startedAt", opts.from));
+  if (opts.to) queries.push(Query.lessThan("startedAt", opts.to));
+  const res = await requireDatabases().listDocuments(
+    DB,
+    COLLECTIONS.timeEntries,
+    queries,
+  );
+  let rows = (res.documents as unknown as Doc[]).map(toTimeEntry);
+  if (opts.taskIds && opts.taskIds.length > 0) {
+    const set = new Set(opts.taskIds);
+    rows = rows.filter((e) => set.has(e.taskId));
+  }
+  return rows;
+}
+
+export async function createTimeEntry(
+  userId: string,
+  input: TimeEntryInput,
+): Promise<TimeEntry> {
+  if (!input.taskId) throw new Error("A task is required.");
+  validateEntryRange(input.startedAt, input.endedAt);
+  const doc = (await requireDatabases().createDocument(
+    DB,
+    COLLECTIONS.timeEntries,
+    ID.unique(),
+    {
+      userId,
+      taskId: input.taskId,
+      type: input.type ?? "WORK",
+      startedAt: input.startedAt,
+      endedAt: input.endedAt,
+    },
+    ownerPermissions(userId),
+  )) as unknown as Doc;
+  return toTimeEntry(doc);
+}
+
+export async function updateTimeEntry(
+  entryId: string,
+  patch: Partial<Pick<TimeEntry, "taskId" | "type" | "startedAt" | "endedAt">>,
+): Promise<TimeEntry> {
+  const data: Record<string, unknown> = {};
+  if (patch.taskId !== undefined) {
+    if (!patch.taskId) throw new Error("A task is required.");
+    data.taskId = patch.taskId;
+  }
+  if (patch.type !== undefined) data.type = patch.type;
+  if (patch.startedAt !== undefined) data.startedAt = patch.startedAt;
+  if (patch.endedAt !== undefined) data.endedAt = patch.endedAt;
+  if (data.startedAt !== undefined || data.endedAt !== undefined) {
+    // Range check needs both ends — fetch the doc when patching one side.
+    let startedAt = typeof data.startedAt === "string" ? data.startedAt : null;
+    let endedAt =
+      data.endedAt === undefined
+        ? undefined
+        : (data.endedAt as string | null);
+    if (startedAt === null || endedAt === undefined) {
+      const current = (await requireDatabases().getDocument(
+        DB,
+        COLLECTIONS.timeEntries,
+        entryId,
+      )) as unknown as Doc;
+      if (startedAt === null) startedAt = String(current.startedAt ?? "");
+      if (endedAt === undefined)
+        endedAt = typeof current.endedAt === "string" ? current.endedAt : null;
+    }
+    validateEntryRange(startedAt ?? "", endedAt ?? null);
+  }
+  const doc = (await requireDatabases().updateDocument(
+    DB,
+    COLLECTIONS.timeEntries,
+    entryId,
+    data,
+  )) as unknown as Doc;
+  return toTimeEntry(doc);
+}
+
+export async function deleteTimeEntry(entryId: string): Promise<void> {
+  await requireDatabases().deleteDocument(DB, COLLECTIONS.timeEntries, entryId);
+}
+
+// ---- Profiles (Phase 5 settings polish) ----
+
+export async function updateProfile(
+  profileId: string,
+  patch: Partial<Pick<Profile, "name" | "timezone" | "avatarUrl">>,
+): Promise<Profile> {
+  const data: Record<string, unknown> = {};
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new Error("A name is required.");
+    data.name = name;
+  }
+  if (patch.timezone !== undefined) {
+    if (!patch.timezone) throw new Error("A timezone is required.");
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: patch.timezone });
+    } catch {
+      throw new Error("Unknown timezone.");
+    }
+    data.timezone = patch.timezone;
+  }
+  if (patch.avatarUrl !== undefined) data.avatarUrl = patch.avatarUrl;
+  const doc = (await requireDatabases().updateDocument(
+    DB,
+    COLLECTIONS.profiles,
+    profileId,
+    data,
+  )) as unknown as Doc;
+  return toProfile(doc);
 }
 
 // ---- First-run setup: profile + seed "Personal" project ----

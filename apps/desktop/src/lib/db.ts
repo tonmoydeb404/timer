@@ -1,11 +1,14 @@
 import {
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
+  type EntryType,
+  type Profile,
   type Project,
   type ProjectStatus,
   type Task,
   type TaskPriority,
   type TaskStatus,
+  type TimeEntry,
 } from "@packages/domain/index";
 import { ID, Permission, Query, Role } from "appwrite";
 import type { Models } from "appwrite";
@@ -61,6 +64,34 @@ export function toTask(doc: Doc): Task {
   };
 }
 
+export function toProfile(doc: Doc): Profile {
+  return {
+    $id: doc.$id,
+    $createdAt: doc.$createdAt,
+    $updatedAt: doc.$updatedAt,
+    $permissions: doc.$permissions,
+    userId: String(doc.userId ?? ""),
+    name: String(doc.name ?? ""),
+    email: String(doc.email ?? ""),
+    avatarUrl: str(doc.avatarUrl),
+    timezone: String(doc.timezone ?? "UTC"),
+  };
+}
+
+export function toTimeEntry(doc: Doc): TimeEntry {
+  return {
+    $id: doc.$id,
+    $createdAt: doc.$createdAt,
+    $updatedAt: doc.$updatedAt,
+    $permissions: doc.$permissions,
+    userId: String(doc.userId ?? ""),
+    taskId: String(doc.taskId ?? ""),
+    type: (doc.type as EntryType) ?? "WORK",
+    startedAt: String(doc.startedAt ?? ""),
+    endedAt: str(doc.endedAt),
+  };
+}
+
 const DB = APPWRITE_DATABASE_ID;
 
 export async function listProjects(userId: string): Promise<Project[]> {
@@ -108,6 +139,28 @@ export async function createTask(
     ownerPermissions(userId),
   )) as unknown as Doc;
   return toTask(doc);
+}
+
+export async function getProfile(userId: string): Promise<Profile | null> {
+  const res = await requireDatabases().listDocuments(DB, COLLECTIONS.profiles, [
+    Query.equal("userId", userId),
+    Query.limit(1),
+  ]);
+  const doc = res.documents[0] as unknown as Doc | undefined;
+  return doc ? toProfile(doc) : null;
+}
+
+/** Recent closed entries, newest first (history + weekly totals). */
+export async function listTimeEntries(
+  userId: string,
+  limit = 200,
+): Promise<TimeEntry[]> {
+  const res = await requireDatabases().listDocuments(DB, COLLECTIONS.timeEntries, [
+    Query.equal("userId", userId),
+    Query.orderDesc("startedAt"),
+    Query.limit(Math.min(Math.max(limit, 1), 500)),
+  ]);
+  return (res.documents as unknown as Doc[]).map(toTimeEntry);
 }
 
 export type PendingUpload = {
