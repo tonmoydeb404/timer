@@ -1,4 +1,5 @@
 use tauri::{image::Image, menu::MenuEvent, tray::TrayIconBuilder, Emitter, Manager};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_updater::UpdaterExt;
 
@@ -78,10 +79,14 @@ pub fn run() {
             crate::show_window(app);
         }))
         .setup(|app| {
-            // Register the `timer://` scheme so the OS routes OAuth
-            // callbacks back to this app.
-            #[cfg(desktop)]
-            app.deep_link().register_all()?;
+            // Register the `timer://` scheme where the OS needs runtime
+            // registration (Windows registry / Linux desktop entry).
+            // macOS registers schemes via the bundled Info.plist, and the
+            // plugin reports UnsupportedPlatform there — never fatal.
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            if let Err(e) = app.deep_link().register_all() {
+                eprintln!("deep-link registration failed: {e}");
+            }
 
             // autostart launches with --hidden: stay in the tray without a
             // window; a normal launch shows the main window immediately
