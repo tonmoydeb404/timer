@@ -11,6 +11,8 @@ type Props = {
   onValueChange: (taskId: string) => void;
   /** Restrict results to a single project. */
   projectId?: string;
+  /** A pinned option (e.g. "All tasks") always shown above the search results. */
+  extraOption?: ComboboxOption;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -22,6 +24,7 @@ export function TaskSelect({
   value,
   onValueChange,
   projectId,
+  extraOption,
   disabled,
   placeholder = "Search tasks…",
   className,
@@ -57,6 +60,7 @@ export function TaskSelect({
       onValueChange={onValueChange}
       search={search}
       resolveLabel={resolveLabel}
+      extraOption={extraOption}
       placeholder={placeholder}
       emptyText="No tasks found."
       disabled={disabled}

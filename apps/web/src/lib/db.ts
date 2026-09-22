@@ -1,6 +1,7 @@
 import {
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
+  dayKey,
   entryDurationMs,
   type EntryType,
   type Profile,
@@ -483,6 +484,134 @@ export async function listTimeEntries(
     rows = rows.filter((e) => set.has(e.taskId));
   }
   return rows;
+}
+
+export type TimeEntryQuery = {
+  type?: EntryType | "ALL";
+  /** Scope to one task; takes priority over `projectId`. */
+  taskId?: string;
+  /** Scope to one project — resolved via that project's task ids (time
+   * entries only reference a task, not a project, in the schema). */
+  projectId?: string;
+  /** ISO lower bound (inclusive) on startedAt. */
+  from?: string;
+  /** ISO upper bound (exclusive) on startedAt. */
+  to?: string;
+  limit?: number;
+  offset?: number;
+};
+
+/** Server-side type/task/project/date filter + pagination for the time list view. */
+export async function queryTimeEntries(
+  userId: string,
+  query: TimeEntryQuery = {},
+): Promise<{ entries: TimeEntry[]; total: number }> {
+  const {
+    type = "ALL",
+    taskId,
+    projectId,
+    from,
+    to,
+    limit = 8,
+    offset = 0,
+  } = query;
+
+  let taskIdFilter: string | string[] | undefined = taskId;
+  if (!taskIdFilter && projectId) {
+    const { tasks } = await queryTasks(userId, { projectId, limit: 200 });
+    if (tasks.length === 0) return { entries: [], total: 0 };
+    taskIdFilter = tasks.map((t) => t.$id);
+  }
+
+  const queries = [
+    byUser(userId),
+    Query.orderDesc("startedAt"),
+    Query.limit(limit),
+    Query.offset(offset),
+  ];
+  if (type !== "ALL") queries.push(Query.equal("type", type));
+  if (taskIdFilter) queries.push(Query.equal("taskId", taskIdFilter));
+  if (from) queries.push(Query.greaterThanEqual("startedAt", from));
+  if (to) queries.push(Query.lessThan("startedAt", to));
+
+  const res = await requireDatabases().listDocuments(
+    DB,
+    COLLECTIONS.timeEntries,
+    queries,
+  );
+  return {
+    entries: (res.documents as unknown as Doc[]).map(toTimeEntry),
+    total: res.total,
+  };
+}
+
+export type TimeEntryDayQuery = {
+  type?: EntryType | "ALL";
+  taskId?: string;
+  projectId?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  offset?: number;
+};
+
+/**
+ * Lightweight day-key listing for the time list's top-level pagination —
+ * reads only `startedAt` (via `Query.select`). Actual entries for a given
+ * day are fetched separately, per day group, via `queryTimeEntries`.
+ */
+export async function queryTimeEntryDays(
+  userId: string,
+  timeZone: string,
+  query: TimeEntryDayQuery = {},
+): Promise<{ days: string[]; total: number }> {
+  const {
+    type = "ALL",
+    taskId,
+    projectId,
+    from,
+    to,
+    limit = 8,
+    offset = 0,
+  } = query;
+
+  let taskIdFilter: string | string[] | undefined = taskId;
+  if (!taskIdFilter && projectId) {
+    const { tasks } = await queryTasks(userId, { projectId, limit: 200 });
+    if (tasks.length === 0) return { days: [], total: 0 };
+    taskIdFilter = tasks.map((t) => t.$id);
+  }
+
+  const queries = [
+    byUser(userId),
+    Query.select(["startedAt"]),
+    Query.orderDesc("startedAt"),
+    Query.limit(limit),
+    Query.offset(offset),
+  ];
+  if (type !== "ALL") queries.push(Query.equal("type", type));
+  if (taskIdFilter) queries.push(Query.equal("taskId", taskIdFilter));
+  if (from) queries.push(Query.greaterThanEqual("startedAt", from));
+  if (to) queries.push(Query.lessThan("startedAt", to));
+
+  const res = await requireDatabases().listDocuments(
+    DB,
+    COLLECTIONS.timeEntries,
+    queries,
+  );
+  const docs = res.documents as unknown as Doc[];
+  const days: string[] = [];
+  const seen = new Set<string>();
+  for (const doc of docs) {
+    const ms = new Date(String(doc.startedAt ?? "")).getTime();
+    if (!Number.isFinite(ms)) continue;
+    const day = dayKey(ms, timeZone);
+    if (!seen.has(day)) {
+      seen.add(day);
+      days.push(day);
+    }
+  }
+  return { days, total: res.total };
 }
 
 export type TimeStats = {
