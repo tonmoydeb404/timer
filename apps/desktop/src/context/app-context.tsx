@@ -34,6 +34,9 @@ type AppContextValue = {
    * any pasted URL and creates the session.
    */
   completeSignInWithUrl: (raw: string) => Promise<SignInResult>;
+  /** Clears a stuck `signingIn` flag, e.g. when the user abandons the OAuth
+   * redirect and switches to pasting the link manually. */
+  resetSigningIn: () => void;
   signOut: () => Promise<void>;
   refreshAuth: () => Promise<void>;
 
@@ -96,7 +99,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { ok: false, message: "That link couldn't be read as a URL." };
       }
       if (!userId || !secret) {
-        return { ok: false, message: "Google sign-in failed or was cancelled." };
+        return {
+          ok: false,
+          message: "Google sign-in failed or was cancelled.",
+        };
       }
       const account = getAccount();
       if (!account) {
@@ -221,6 +227,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const resetSigningIn = useCallback(() => setSigningIn(false), []);
+
   const signOut = useCallback(async () => {
     const account = getAccount();
     try {
@@ -265,6 +273,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     signingIn,
     signIn,
     completeSignInWithUrl,
+    resetSigningIn,
     signOut,
     refreshAuth,
     settings,

@@ -1,9 +1,9 @@
+import { useApp } from "@/context/app-context";
+import { brand } from "@/lib/brand";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { Timer } from "lucide-react";
 import { useState } from "react";
-import { useApp } from "@/context/app-context";
-import { brand } from "@/lib/brand";
 
 function GoogleIcon() {
   return (
@@ -29,7 +29,8 @@ function GoogleIcon() {
 }
 
 export function LoginScreen() {
-  const { auth, signingIn, signIn, completeSignInWithUrl } = useApp();
+  const { auth, signingIn, signIn, completeSignInWithUrl, resetSigningIn } =
+    useApp();
   const [message, setMessage] = useState<string | null>(null);
   const [link, setLink] = useState("");
   const [showPaste, setShowPaste] = useState(false);
@@ -114,7 +115,10 @@ export function LoginScreen() {
       {configured && !showPaste && (
         <button
           type="button"
-          onClick={() => setShowPaste(true)}
+          onClick={() => {
+            resetSigningIn();
+            setShowPaste(true);
+          }}
           className="text-[0.76rem] text-muted-foreground underline-offset-2 hover:text-ink hover:underline"
         >
           App didn&apos;t reopen? Paste the sign-in link instead
