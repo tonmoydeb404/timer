@@ -65,19 +65,23 @@ export function LoginScreen() {
           className="h-10 min-w-60"
         >
           <GoogleIcon />
-          {signingIn ? "Waiting for browser sign-in…" : "Continue with Google"}
+          Continue with Google
         </Button>
       ) : (
         <p className="max-w-sm rounded-lg bg-inset p-3 text-center text-[0.78rem] text-muted-foreground">
-          Appwrite is not configured in this build. Set{" "}
+          Appwrite is not configured. Set{" "}
           <code className="rounded bg-inset px-1 py-0.5">
-            APPWRITE_ENDPOINT
+            VITE_APPWRITE_ENDPOINT
           </code>{" "}
           and{" "}
           <code className="rounded bg-inset px-1 py-0.5">
-            APPWRITE_PROJECT_ID
+            VITE_APPWRITE_PROJECT_ID
           </code>{" "}
-          and rebuild.
+          in{" "}
+          <code className="rounded bg-inset px-1 py-0.5">
+            apps/desktop/.env
+          </code>{" "}
+          and restart.
         </p>
       )}
 
@@ -87,10 +91,10 @@ export function LoginScreen() {
         </p>
       )}
 
-      {signingIn && (
-        <p className="text-[0.76rem] text-muted-foreground">
-          Complete sign-in in your browser — you can close that tab
-          afterwards.
+      {configured && (
+        <p className="max-w-xs text-center text-[0.76rem] text-muted-foreground">
+          You&apos;ll approve in your browser, then land back here
+          automatically.
         </p>
       )}
     </main>

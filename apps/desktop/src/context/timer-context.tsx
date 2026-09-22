@@ -9,7 +9,9 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { api, onTimerChanged } from "../lib/api";
+import { uploadTimeEntries } from "../lib/db";
 import type { TimerView } from "../types";
+import { useApp } from "./app-context";
 
 type TimerContextValue = {
   /** Latest view from Rust; null until the first load. */
@@ -33,11 +35,14 @@ type TimerContextValue = {
 const TimerContext = createContext<TimerContextValue | null>(null);
 
 export function TimerProvider({ children }: { children: ReactNode }) {
+  const { auth } = useApp();
   const [view, setView] = useState<TimerView | null>(null);
   const [busy, setBusy] = useState(false);
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
   const [focusId, setFocusId] = useState<string | null>(null);
   const mounted = useRef(true);
+  const uploading = useRef<Set<string>>(new Set());
+  const userId = auth?.user?.id ?? null;
 
   useEffect(() => {
     mounted.current = true;
@@ -67,6 +72,27 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       unlisten.then((fn) => fn());
     };
   }, [refresh, apply]);
+
+  // Upload closed segments via the Appwrite SDK, then ack them in Rust.
+  // Runs on every view change (actions, tray, boot) — the footer surfaces
+  // the leftover count while offline.
+  useEffect(() => {
+    const pending = view?.pending ?? [];
+    if (!userId || pending.length === 0) return;
+    const fresh = pending.filter((e) => !uploading.current.has(e.local_id));
+    if (fresh.length === 0) return;
+    for (const e of fresh) uploading.current.add(e.local_id);
+    (async () => {
+      try {
+        const ids = await uploadTimeEntries(userId, fresh);
+        apply(await api.ackEntries(ids));
+      } catch {
+        // Stay queued; the next view change retries.
+      } finally {
+        for (const e of fresh) uploading.current.delete(e.local_id);
+      }
+    })();
+  }, [view, userId, apply]);
 
   const run = useCallback(
     async (fn: () => Promise<TimerView>, action: string) => {

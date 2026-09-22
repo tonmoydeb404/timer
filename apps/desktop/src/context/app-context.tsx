@@ -1,3 +1,5 @@
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   createContext,
   useCallback,
@@ -7,10 +9,14 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
-import { api, onUpdateAvailable } from "../lib/api";
-import { appwriteEndpoint, appwriteProjectId } from "../lib/config";
-import { signInWithGoogle } from "../lib/oauth";
-import type { AuthState, UpdateInfo } from "../types";
+import { api, onDeepLinkEvent, onUpdateAvailable } from "../lib/api";
+import {
+  OAUTH_CALLBACK_URL,
+  getAccount,
+  googleLoginUrl,
+  isAppwriteConfigured,
+} from "../lib/appwrite";
+import type { AuthState, AuthUser, UpdateInfo } from "../types";
 
 type SignInResult = { ok: true } | { ok: false; message: string };
 
@@ -35,6 +41,10 @@ type AppContextValue = {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+function toUser(data: { $id: string; name: string; email: string }): AuthUser {
+  return { id: data.$id, name: data.name, email: data.email };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,28 +54,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
-  // ---- Data loading ----
+  // ---- Auth (Appwrite SDK session, per the official OAuth guide) ----
 
   const refreshAuth = useCallback(async () => {
+    const account = getAccount();
+    if (!account) {
+      setAuth({ configured: false, status: "unknown", user: null });
+      return;
+    }
     try {
-      setAuth(await api.getAuthState());
-    } catch {
-      setAuth({ configured: true, status: "unknown", user: null });
+      const me = await account.get();
+      setAuth({ configured: true, status: "active", user: toUser(me) });
+    } catch (err) {
+      const status = (err as { code?: number })?.code === 401 ? 401 : 0;
+      setAuth({
+        configured: true,
+        status: status === 401 ? "expired" : "unknown",
+        user: null,
+      });
     }
   }, []);
+
+  const handleAuthUrls = useCallback(
+    async (urls: string[]) => {
+      for (const raw of urls) {
+        if (!raw.startsWith(OAUTH_CALLBACK_URL)) continue;
+        let userId: string | null = null;
+        let secret: string | null = null;
+        try {
+          const parsed = new URL(raw);
+          userId = parsed.searchParams.get("userId");
+          secret = parsed.searchParams.get("secret");
+        } catch {
+          continue;
+        }
+        if (!userId || !secret) {
+          toast.error("Google sign-in failed or was cancelled.");
+          setSigningIn(false);
+          continue;
+        }
+        const account = getAccount();
+        if (!account) {
+          toast.error("Appwrite is not configured.");
+          setSigningIn(false);
+          continue;
+        }
+        try {
+          await account.createSession({ userId, secret });
+          await refreshAuth();
+          toast.success("Signed in.");
+        } catch (err) {
+          toast.error("Couldn't finish sign-in.", {
+            description: err instanceof Error ? err.message : String(err),
+          });
+        } finally {
+          setSigningIn(false);
+        }
+      }
+    },
+    [refreshAuth],
+  );
+
+  // ---- Data loading ----
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
-        // Hand Rust its Appwrite config first: the frontend's `.env` is the
-        // single source, so no shell exports are needed to run or build.
-        await api.setAuthConfig(appwriteEndpoint, appwriteProjectId);
         const backendSettings = await api.getSettings();
         if (cancelled) return;
         setSettings(backendSettings);
         await refreshAuth();
+        // Cold start via deep link (app launched by the OAuth redirect).
+        const current = await getCurrent().catch(() => null);
+        if (!cancelled && current && current.length > 0) {
+          await handleAuthUrls(current);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load data");
@@ -79,7 +144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [refreshAuth]);
+  }, [refreshAuth, handleAuthUrls]);
 
   // ---- Event listeners ----
 
@@ -87,42 +152,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const unlistenUpdatePromise = onUpdateAvailable((payload) => {
       setUpdateInfo(payload);
     });
+    const unlistenUrlPromise = onOpenUrl((urls) => {
+      void handleAuthUrls(urls);
+    });
+    const unlistenDeepLinkPromise = onDeepLinkEvent((urls) => {
+      void handleAuthUrls(urls);
+    });
 
     return () => {
       unlistenUpdatePromise.then((fn) => fn());
+      unlistenUrlPromise.then((fn) => fn());
+      unlistenDeepLinkPromise.then((fn) => fn());
     };
-  }, []);
+  }, [handleAuthUrls]);
 
-  // ---- Auth ----
+  // ---- Auth actions ----
 
   const signIn = useCallback(async (): Promise<SignInResult> => {
+    if (!isAppwriteConfigured()) {
+      return { ok: false, message: "Appwrite is not configured." };
+    }
     setSigningIn(true);
     try {
-      const outcome = await signInWithGoogle();
-      if (outcome.kind !== "success") {
-        return { ok: false, message: outcome.message };
-      }
-      await api.setSession(outcome.userId, outcome.secret);
-      await refreshAuth();
+      await openUrl(googleLoginUrl());
+      toast.info("Continue in your browser to finish sign-in.");
       return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return { ok: false, message };
-    } finally {
       setSigningIn(false);
+      return { ok: false, message };
     }
-  }, [refreshAuth]);
+  }, []);
 
   const signOut = useCallback(async () => {
+    const account = getAccount();
     try {
-      await api.signOut();
+      if (account) await account.deleteSession("current");
     } catch (err) {
       toast.error("Failed to sign out", {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      await refreshAuth();
+      setSigningIn(false);
     }
+    await refreshAuth();
   }, [refreshAuth]);
 
   // ---- Settings ----

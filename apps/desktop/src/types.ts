@@ -1,5 +1,5 @@
-// Types shared across the frontend. Keep backend (raw) types matching the
-// Rust serde output (snake_case); define view types here as needed.
+// Types shared across the frontend. Backend (raw) types match the Rust
+// serde output (snake_case); Appwrite shapes come from @packages/domain.
 
 export type UpdateInfo = {
   version: string;
@@ -7,7 +7,7 @@ export type UpdateInfo = {
   date: string | null;
 };
 
-// ---- Auth (mirrors Rust appwrite.rs + packages/domain AuthState) ----
+// ---- Auth (Appwrite SDK session in the webview) ----
 
 export type AuthStatus = "signed_out" | "active" | "expired" | "unknown";
 
@@ -18,23 +18,10 @@ export type AuthUser = {
 };
 
 export type AuthState = {
+  /** False when the Appwrite endpoint/project ID are not configured. */
   configured: boolean;
   status: AuthStatus;
   user: AuthUser | null;
-};
-
-export type AuthConfig = {
-  endpoint: string;
-  project_configured: boolean;
-};
-
-export type OAuthPollStatus = "pending" | "success" | "error";
-
-export type OAuthPoll = {
-  status: OAuthPollStatus;
-  user_id: string | null;
-  secret: string | null;
-  message: string | null;
 };
 
 // ---- Timer (mirrors Rust timer.rs serde output) ----
@@ -50,6 +37,15 @@ export type SegmentView = {
   duration_ms: number;
 };
 
+export type PendingEntry = {
+  local_id: string;
+  task_id: string;
+  type: SegmentType;
+  started_at: string;
+  ended_at: string;
+  attempts: number;
+};
+
 export type TimerView = {
   status: TimerStatus;
   task_id: string | null;
@@ -60,4 +56,5 @@ export type TimerView = {
   break_ms: number;
   segments: SegmentView[];
   pending_count: number;
+  pending: PendingEntry[];
 };

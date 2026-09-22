@@ -55,6 +55,8 @@ pub struct ActiveTimer {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingEntry {
+    /// Local id for upload acknowledgement (frontend confirms by id).
+    pub local_id: String,
     pub task_id: String,
     #[serde(rename = "type")]
     pub kind: SegmentType,
@@ -68,6 +70,8 @@ pub struct TimerStore {
     pub active: Option<ActiveTimer>,
     #[serde(default)]
     pub pending: Vec<PendingEntry>,
+    #[serde(default)]
+    pub next_id: u64,
 }
 
 // ---- Wall clock ----
@@ -196,7 +200,7 @@ pub fn resume(store: &mut TimerStore, at_ms: i64) -> Result<(), TransitionError>
 pub fn stop(store: &mut TimerStore, at_ms: i64) -> Result<Vec<PendingEntry>, TransitionError> {
     let mut active = store.active.take().ok_or(TransitionError::NotRunning)?;
     close_open_segment(&mut active, at_ms);
-    Ok(segments_to_entries(&active))
+    Ok(segments_to_entries(store, &active))
 }
 
 /// Switch task: closes the current timer into entries and starts a fresh
@@ -212,7 +216,7 @@ pub fn switch_task(
     Ok(entries)
 }
 
-fn segments_to_entries(active: &ActiveTimer) -> Vec<PendingEntry> {
+fn segments_to_entries(store: &mut TimerStore, active: &ActiveTimer) -> Vec<PendingEntry> {
     active
         .segments
         .iter()
@@ -221,7 +225,9 @@ fn segments_to_entries(active: &ActiveTimer) -> Vec<PendingEntry> {
             if ended <= s.started_at_ms {
                 return None;
             }
+            store.next_id += 1;
             Some(PendingEntry {
+                local_id: format!("{}-{}", s.started_at_ms, store.next_id),
                 task_id: active.task_id.clone(),
                 kind: s.kind,
                 started_at: to_iso(s.started_at_ms),
@@ -254,6 +260,9 @@ pub struct TimerView {
     pub break_ms: i64,
     pub segments: Vec<SegmentView>,
     pub pending_count: usize,
+    /// Closed segments waiting for upload. The frontend uploads them via
+    /// the Appwrite SDK and confirms with `ack_entries`.
+    pub pending: Vec<PendingEntry>,
 }
 
 pub fn view(store: &TimerStore, at_ms: i64) -> TimerView {
@@ -268,6 +277,7 @@ pub fn view(store: &TimerStore, at_ms: i64) -> TimerView {
             break_ms: 0,
             segments: vec![],
             pending_count: store.pending.len(),
+            pending: store.pending.clone(),
         };
     };
 
@@ -302,6 +312,7 @@ pub fn view(store: &TimerStore, at_ms: i64) -> TimerView {
         break_ms,
         segments,
         pending_count: store.pending.len(),
+        pending: store.pending.clone(),
     }
 }
 

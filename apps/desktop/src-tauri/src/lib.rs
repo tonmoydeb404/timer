@@ -1,7 +1,7 @@
 use tauri::{image::Image, menu::MenuEvent, tray::TrayIconBuilder, Emitter, Manager};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_updater::UpdaterExt;
 
-mod appwrite;
 mod brand;
 mod commands;
 mod db;
@@ -64,7 +64,25 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--hidden"]),
         ))
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // Windows/Linux deliver deep links by spawning a new instance:
+            // forward timer:// URLs to the running app instead.
+            let urls: Vec<String> = args
+                .into_iter()
+                .filter(|a| a.starts_with("timer://"))
+                .collect();
+            if !urls.is_empty() {
+                let _ = app.emit("timer://deep-link", urls);
+            }
+            crate::show_window(app);
+        }))
         .setup(|app| {
+            // Register the `timer://` scheme so the OS routes OAuth
+            // callbacks back to this app.
+            #[cfg(desktop)]
+            app.deep_link().register_all()?;
+
             // autostart launches with --hidden: stay in the tray without a
             // window; a normal launch shows the main window immediately
             let launch_hidden = std::env::args().any(|arg| arg == "--hidden");
@@ -91,31 +109,6 @@ pub fn run() {
             let conn = db::open_connection(&app_data_dir).expect("failed to open database");
 
             app.manage(AppState::new(conn, app_data_dir));
-
-            // Retry any entries left pending by a previous run (e.g. the
-            // app was stopped offline). Silent when signed out.
-            let flush_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let state = flush_handle.state::<AppState>();
-                let _guard = state.timer_lock.lock().await;
-                let session = {
-                    match state.db.lock() {
-                        Ok(conn) => match appwrite::require_session(&conn) {
-                            Ok(s) => s,
-                            Err(_) => return,
-                        },
-                        Err(_) => return,
-                    }
-                };
-                let mut store = timer::load(&state.app_data_dir);
-                if store.pending.is_empty() {
-                    return;
-                }
-                appwrite::push_pending(&state.http, &session, &mut store).await;
-                let _ = timer::save(&state.app_data_dir, &store);
-                let view = timer::view(&store, timer::now_ms());
-                let _ = flush_handle.emit("timer://changed", &view);
-            });
 
             let updater_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -152,17 +145,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_auth_config,
-            commands::set_auth_config,
-            commands::get_auth_state,
-            commands::set_session,
-            commands::sign_out,
-            commands::open_oauth_window,
-            commands::poll_oauth,
-            commands::list_projects,
-            commands::list_tasks,
-            commands::create_task,
             commands::get_timer_state,
+            commands::ack_entries,
             commands::start_timer,
             commands::take_break,
             commands::resume_timer,

@@ -29,14 +29,14 @@ import { formatDuration, formatDurationShort } from "@packages/domain/time";
 import { useApp } from "@/context/app-context";
 import { useTimer } from "@/context/timer-context";
 import { useTasks } from "@/hooks/use-tasks";
-import { api, onOpenSwitcher } from "@/lib/api";
+import { onOpenSwitcher } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 // Today tab: project strip, live timer card, summaries, task queue.
 // Elapsed time derives from stored timestamps; the display ticks locally.
 export function TodayScreen() {
   const { auth } = useApp();
-  const { projects, tasks, loading, error, refresh } = useTasks();
+  const { projects, tasks, loading, error, refresh, quickAdd } = useTasks();
   const {
     view,
     busy,
@@ -138,7 +138,7 @@ export function TodayScreen() {
     if (!title || !runningProjectId || pickerAdding) return;
     setPickerAdding(true);
     try {
-      const created = await api.createTask(runningProjectId, title);
+      const created = await quickAdd(runningProjectId, title);
       setPickerQuickTitle("");
       setPickerOpen(false);
       await switchTo(created.$id, created.title);

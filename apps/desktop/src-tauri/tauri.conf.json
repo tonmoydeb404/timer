@@ -31,6 +31,13 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "timer"
+        ]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://github.com/your-username/my-app/releases/latest/download/latest.json"

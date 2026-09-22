@@ -1,37 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { Project, Task } from "@packages/domain/index";
-import type {
-  AuthConfig,
-  AuthState,
-  AuthUser,
-  OAuthPoll,
-  TimerView,
-  UpdateInfo,
-} from "../types";
+import type { TimerView, UpdateInfo } from "../types";
 
 // All IPC wrappers live here — one entry per Rust command in
-// src-tauri/src/commands.rs.
+// src-tauri/src/commands.rs. Appwrite I/O happens in the webview via the
+// Appwrite SDK (see lib/appwrite.ts, lib/db.ts); Rust owns local state.
 
 export const api = {
-  getAuthConfig: () => invoke<AuthConfig>("get_auth_config"),
-  setAuthConfig: (endpoint: string, projectId: string) =>
-    invoke<void>("set_auth_config", { endpoint, projectId }),
-  getAuthState: () => invoke<AuthState>("get_auth_state"),
-  setSession: (userId: string, secret: string) =>
-    invoke<AuthUser>("set_session", { userId, secret }),
-  signOut: () => invoke<void>("sign_out"),
-
-  openOAuthWindow: () => invoke<void>("open_oauth_window"),
-  pollOAuth: () => invoke<OAuthPoll>("poll_oauth"),
-
-  listProjects: () => invoke<Project[]>("list_projects"),
-  listTasks: (projectId?: string | null) =>
-    invoke<Task[]>("list_tasks", { projectId: projectId ?? null }),
-  createTask: (projectId: string, title: string) =>
-    invoke<Task>("create_task", { projectId, title }),
-
   getTimerState: () => invoke<TimerView>("get_timer_state"),
+  ackEntries: (localIds: string[]) =>
+    invoke<TimerView>("ack_entries", { localIds }),
   startTimer: (taskId: string, taskTitle: string) =>
     invoke<TimerView>("start_timer", { taskId, taskTitle }),
   takeBreak: () => invoke<TimerView>("take_break"),
@@ -71,4 +49,13 @@ export function onTimerChanged(
 
 export function onOpenSwitcher(callback: () => void): Promise<UnlistenFn> {
   return listen("timer://open-switcher", () => callback());
+}
+
+// Deep-link URLs forwarded by the single-instance guard (Windows/Linux).
+export function onDeepLinkEvent(
+  callback: (urls: string[]) => void,
+): Promise<UnlistenFn> {
+  return listen<string[]>("timer://deep-link", (event) =>
+    callback(event.payload),
+  );
 }
