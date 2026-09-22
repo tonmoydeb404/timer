@@ -1,66 +1,57 @@
 "use client";
 
+import { useProjects } from "@/contexts/app/app-context";
+import type { Project } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import { Textarea } from "@packages/ui/components/textarea";
 import { useEffect, useState } from "react";
-import type { Project } from "@packages/domain/index";
-import { createProject, updateProject } from "@/lib/db";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userId: string;
   /** Edit target; null/undefined = create mode. */
   project?: Project | null;
-  onSaved: (project: Project) => void;
+  onSaved?: (project: Project) => void;
 };
 
-export function ProjectDialog({
-  open,
-  onOpenChange,
-  userId,
-  project,
-  onSaved,
-}: Props) {
+export function ProjectDialog({ open, onOpenChange, project, onSaved }: Props) {
+  const { create, update } = useProjects();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const saving = create.isLoading || update.isLoading;
+  const error = validationError || create.error || update.error;
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
+    setValidationError(null);
     setName(project?.name ?? "");
     setDescription(project?.description ?? "");
   }, [open, project]);
 
   async function handleSave() {
     if (!name.trim()) {
-      setError("A project name is required.");
+      setValidationError("A project name is required.");
       return;
     }
-    setSaving(true);
-    setError(null);
+    setValidationError(null);
     try {
       const saved = project
-        ? await updateProject(project.$id, {
+        ? await update.run(project.$id, {
             name: name.trim(),
             description: description.trim() || null,
           })
-        : await createProject(userId, {
+        : await create.run({
             name: name.trim(),
             description: description.trim() || null,
           });
-      onSaved(saved);
+      onSaved?.(saved);
       onOpenChange(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Couldn't save the project.",
-      );
-    } finally {
-      setSaving(false);
+    } catch {
+      // Surfaced via create.error/update.error from the hook.
     }
   }
 

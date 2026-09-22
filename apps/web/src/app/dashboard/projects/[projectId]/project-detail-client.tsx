@@ -1,30 +1,18 @@
 "use client";
 
+import { TaskList } from "@/components/tasks/task-list";
+import { appPaths } from "@/config/paths-config";
+import { useProjects } from "@/contexts/app/app-context";
+import { useAuth } from "@/lib/auth-context";
 import { Badge } from "@packages/ui/components/badge";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { Project } from "@packages/domain/index";
-import { appPaths } from "@/config/paths-config";
-import { useAuth } from "@/lib/auth-context";
-import { getProject, listProjects } from "@/lib/db";
-import { TaskList } from "@/components/tasks/task-list";
 
 export function ProjectDetailClient({ projectId }: { projectId: string }) {
   const { user } = useAuth();
-  const [project, setProject] = useState<Project | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    Promise.all([getProject(projectId), listProjects(user.$id)])
-      .then(([p, all]) => {
-        setProject(p);
-        setProjects(all);
-      })
-      .finally(() => setLoading(false));
-  }, [user, projectId]);
+  const { projects: allProjects, loading } = useProjects();
+  const projects = allProjects.filter((p) => !p.deletedAt);
+  const project = projects.find((p) => p.$id === projectId) ?? null;
 
   if (!user) return null;
   if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -55,7 +43,9 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
           Projects
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {project.name}
+          </h1>
           {project.status === "ARCHIVED" && (
             <Badge variant="secondary">Archived</Badge>
           )}
@@ -65,7 +55,7 @@ export function ProjectDetailClient({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      <TaskList userId={user.$id} projects={projects} presetProjectId={project.$id} />
+      <TaskList projects={projects} presetProjectId={project.$id} />
     </div>
   );
 }

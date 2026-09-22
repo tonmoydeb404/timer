@@ -1,5 +1,22 @@
 "use client";
 
+import { TimeEntryDialog } from "@/components/time/time-entry-dialog";
+import {
+  useProjects,
+  useTasks,
+  useTimeEntries,
+} from "@/contexts/app/app-context";
+import { useAuth } from "@/lib/auth-context";
+import { getProfile } from "@/lib/db";
+import {
+  aggregateDayTotals,
+  entryDurationMs,
+  formatDuration,
+  formatDurationShort,
+  groupEntriesByStartDay,
+  type EntryType,
+  type TimeEntry,
+} from "@packages/domain/index";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,26 +40,6 @@ import {
 } from "@packages/ui/components/select";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  aggregateDayTotals,
-  entryDurationMs,
-  formatDuration,
-  formatDurationShort,
-  groupEntriesByStartDay,
-  type EntryType,
-  type Project,
-  type Task,
-  type TimeEntry,
-} from "@packages/domain/index";
-import { useAuth } from "@/lib/auth-context";
-import {
-  deleteTimeEntry,
-  getProfile,
-  listProjects,
-  listTasks,
-  listTimeEntries,
-} from "@/lib/db";
-import { TimeEntryDialog } from "@/components/time/time-entry-dialog";
 
 const TYPE_FILTERS: { value: EntryType | "ALL"; label: string }[] = [
   { value: "ALL", label: "All" },
@@ -60,11 +57,20 @@ function defaultRange(): { from: string; to: string } {
 export function TimeClient() {
   const { user } = useAuth();
   const [timeZone, setTimeZone] = useState("UTC");
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [entries, setEntries] = useState<TimeEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const { projects } = useProjects();
+  const { tasks, loading: tasksLoading, error: tasksError } = useTasks();
+  const {
+    timeEntries: entries,
+    loading: entriesLoading,
+    error: entriesError,
+    reload: reloadEntries,
+    remove,
+  } = useTimeEntries();
+  const loading = profileLoading || tasksLoading || entriesLoading;
+  const error = profileError || tasksError || entriesError;
+  const actionError = remove.error;
 
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState("ALL");
@@ -74,50 +80,54 @@ export function TimeClient() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TimeEntry | null>(null);
   const [deleting, setDeleting] = useState<TimeEntry | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
-  const taskById = useMemo(() => new Map(tasks.map((t) => [t.$id, t])), [tasks]);
+  const taskById = useMemo(
+    () => new Map(tasks.map((t) => [t.$id, t])),
+    [tasks],
+  );
   const projectById = useMemo(
     () => new Map(projects.map((p) => [p.$id, p])),
     [projects],
   );
 
-  const refresh = useCallback(async () => {
+  const loadProfile = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
-    setError(null);
+    setProfileLoading(true);
+    setProfileError(null);
     try {
-      const [profile, fetchedProjects, fetchedTasks, fetchedEntries] =
-        await Promise.all([
-          getProfile(user.$id),
-          listProjects(user.$id, true, true),
-          listTasks(user.$id, { includeDeleted: true }),
-          listTimeEntries(user.$id, { limit: 500 }),
-        ]);
+      const profile = await getProfile(user.$id);
       setTimeZone(
         profile?.timezone ||
           (typeof Intl !== "undefined"
             ? Intl.DateTimeFormat().resolvedOptions().timeZone
             : "UTC"),
       );
-      setProjects(fetchedProjects);
-      setTasks(fetchedTasks);
-      setEntries(fetchedEntries);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load history.");
+      setProfileError(
+        err instanceof Error ? err.message : "Couldn't load history.",
+      );
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void loadProfile();
+  }, [loadProfile]);
+
+  const refresh = useCallback(() => {
+    void loadProfile();
+    void reloadEntries();
+  }, [loadProfile, reloadEntries]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const fromMs = range.from ? new Date(`${range.from}T00:00:00`).getTime() : NaN;
-    const toMs = range.to ? new Date(`${range.to}T00:00:00`).getTime() + 24 * 3600 * 1000 : NaN;
+    const fromMs = range.from
+      ? new Date(`${range.from}T00:00:00`).getTime()
+      : NaN;
+    const toMs = range.to
+      ? new Date(`${range.to}T00:00:00`).getTime() + 24 * 3600 * 1000
+      : NaN;
     return entries.filter((e) => {
       if (typeFilter !== "ALL" && e.type !== typeFilter) return false;
       if (projectFilter !== "ALL") {
@@ -165,24 +175,11 @@ export function TimeClient() {
     if (!deleting) return;
     const id = deleting.$id;
     setDeleting(null);
-    setActionError(null);
-    setEntries((prev) => prev.filter((e) => e.$id !== id));
     try {
-      await deleteTimeEntry(id);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Couldn't delete the entry.");
-      void refresh();
+      await remove.run(id);
+    } catch {
+      // Surfaced via remove.error from the hook.
     }
-  }
-
-  function handleSaved(saved: TimeEntry) {
-    setEntries((prev) => {
-      const exists = prev.some((e) => e.$id === saved.$id);
-      const next = exists
-        ? prev.map((e) => (e.$id === saved.$id ? saved : e))
-        : [saved, ...prev];
-      return next.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-    });
   }
 
   if (!user) return null;
@@ -198,7 +195,13 @@ export function TimeClient() {
             Every tracked session, grouped by day in {timeZone}.
           </p>
         </div>
-        <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+        >
           <Plus size={14} />
           Log time
         </Button>
@@ -211,7 +214,10 @@ export function TimeClient() {
           placeholder="Search tasks…"
           className="h-9 max-w-56"
         />
-        <Select value={projectFilter} onValueChange={(v) => setProjectFilter(v ?? "ALL")}>
+        <Select
+          value={projectFilter}
+          onValueChange={(v) => setProjectFilter(v ?? "ALL")}
+        >
           <SelectTrigger className="h-9 w-44">
             <SelectValue placeholder="Project" />
           </SelectTrigger>
@@ -264,7 +270,9 @@ export function TimeClient() {
         error={error}
         data={groups}
         onRetry={() => void refresh()}
-        emptyTitle={entries.length === 0 ? "No time tracked yet" : "No matching entries"}
+        emptyTitle={
+          entries.length === 0 ? "No time tracked yet" : "No matching entries"
+        }
         emptyHint={
           entries.length === 0
             ? "Start the timer in the desktop app — sessions sync here for review."
@@ -272,7 +280,13 @@ export function TimeClient() {
         }
         emptyAction={
           entries.length === 0 ? (
-            <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
               <Plus size={14} />
               Log time
             </Button>
@@ -296,14 +310,23 @@ export function TimeClient() {
                   <ul className="grid gap-2">
                     {rows.map((entry) => {
                       const task = taskById.get(entry.taskId);
-                      const project = task ? projectById.get(task.projectId) : undefined;
-                      const duration = entryDurationMs(entry.startedAt, entry.endedAt);
+                      const project = task
+                        ? projectById.get(task.projectId)
+                        : undefined;
+                      const duration = entryDurationMs(
+                        entry.startedAt,
+                        entry.endedAt,
+                      );
                       return (
                         <li
                           key={entry.$id}
                           className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
                         >
-                          <Badge variant={entry.type === "BREAK" ? "secondary" : "outline"}>
+                          <Badge
+                            variant={
+                              entry.type === "BREAK" ? "secondary" : "outline"
+                            }
+                          >
                             {entry.type === "BREAK" ? "Break" : "Work"}
                           </Badge>
                           <div className="grid min-w-0 flex-1 gap-0.5">
@@ -315,10 +338,14 @@ export function TimeClient() {
                               <span className="tabular-nums">
                                 {formatInstant(entry.startedAt)}
                                 {" → "}
-                                {entry.endedAt ? formatInstant(entry.endedAt) : "open"}
+                                {entry.endedAt
+                                  ? formatInstant(entry.endedAt)
+                                  : "open"}
                               </span>
                               <span className="font-medium text-foreground tabular-nums">
-                                {entry.endedAt ? formatDuration(duration) : "open"}
+                                {entry.endedAt
+                                  ? formatDuration(duration)
+                                  : "open"}
                               </span>
                             </span>
                           </div>
@@ -326,7 +353,10 @@ export function TimeClient() {
                             variant="ghost"
                             size="icon"
                             aria-label="Edit entry"
-                            onClick={() => { setEditing(entry); setDialogOpen(true); }}
+                            onClick={() => {
+                              setEditing(entry);
+                              setDialogOpen(true);
+                            }}
                           >
                             <Pencil size={14} />
                           </Button>
@@ -352,18 +382,20 @@ export function TimeClient() {
       <TimeEntryDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        userId={user.$id}
         tasks={activeTasks}
         entry={editing}
-        onSaved={handleSaved}
       />
 
-      <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && setDeleting(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this entry?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the session from totals and history. This can&apos;t be undone.
+              This removes the session from totals and history. This can&apos;t
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

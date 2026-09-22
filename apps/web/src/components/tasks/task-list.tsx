@@ -1,5 +1,8 @@
 "use client";
 
+import { useTasks } from "@/contexts/app/app-context";
+import { cn } from "@/lib/utils";
+import type { Project, Task, TaskStatus } from "@packages/domain/index";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,10 +25,7 @@ import {
   SelectValue,
 } from "@packages/ui/components/select";
 import { Check, Pencil, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Project, Task, TaskStatus } from "@packages/domain/index";
-import { cn } from "@/lib/utils";
-import { deleteTask, listTasks, updateTask } from "@/lib/db";
+import { useCallback, useMemo, useState } from "react";
 import { TaskFormDialog } from "./task-form-dialog";
 
 const STATUS_FILTERS: { value: TaskStatus | "ALL"; label: string }[] = [
@@ -42,7 +42,6 @@ const PRIORITY_STYLES: Record<string, string> = {
 };
 
 type Props = {
-  userId: string;
   projects: Project[];
   /** When set, the list is scoped to one project (filter UI hidden). */
   presetProjectId?: string;
@@ -50,15 +49,15 @@ type Props = {
   actions?: React.ReactNode;
 };
 
-export function TaskList({
-  userId,
-  projects,
-  presetProjectId,
-  actions,
-}: Props) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function TaskList({ projects, presetProjectId, actions }: Props) {
+  const {
+    tasks: allTasks,
+    loading,
+    error,
+    reload: refresh,
+    update,
+    remove,
+  } = useTasks();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "ALL">("ALL");
   const [projectFilter, setProjectFilter] = useState<string>("ALL");
@@ -66,32 +65,18 @@ export function TaskList({
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
 
+  const tasks = useMemo(() => {
+    const notDeleted = allTasks.filter((t) => !t.deletedAt);
+    return presetProjectId
+      ? notDeleted.filter((t) => t.projectId === presetProjectId)
+      : notDeleted;
+  }, [allTasks, presetProjectId]);
+
   const projectName = useCallback(
     (projectId: string) =>
       projects.find((p) => p.$id === projectId)?.name ?? "Unknown",
     [projects],
   );
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setTasks(
-        await listTasks(
-          userId,
-          presetProjectId ? { projectId: presetProjectId } : {},
-        ),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load tasks.");
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, presetProjectId]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -110,12 +95,8 @@ export function TaskList({
 
   async function toggleDone(task: Task) {
     const next: TaskStatus = task.status === "DONE" ? "TODO" : "DONE";
-    setTasks((prev) =>
-      prev.map((t) => (t.$id === task.$id ? { ...t, status: next } : t)),
-    );
     try {
-      const saved = await updateTask(task.$id, { status: next });
-      setTasks((prev) => prev.map((t) => (t.$id === task.$id ? saved : t)));
+      await update.run(task.$id, { status: next });
     } catch {
       void refresh();
     }
@@ -125,9 +106,8 @@ export function TaskList({
     if (!deleting) return;
     const id = deleting.$id;
     setDeleting(null);
-    setTasks((prev) => prev.filter((t) => t.$id !== id));
     try {
-      await deleteTask(id);
+      await remove.run(id);
     } catch {
       void refresh();
     }
@@ -291,21 +271,9 @@ export function TaskList({
       <TaskFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        userId={userId}
         projects={projects}
         task={editing}
         fixedProjectId={presetProjectId}
-        onSaved={(saved) => {
-          setTasks((prev) => {
-            const exists = prev.some((t) => t.$id === saved.$id);
-            const next = exists
-              ? prev.map((t) => (t.$id === saved.$id ? saved : t))
-              : [saved, ...prev];
-            return next.sort((a, b) =>
-              b.$updatedAt.localeCompare(a.$updatedAt),
-            );
-          });
-        }}
       />
 
       <AlertDialog

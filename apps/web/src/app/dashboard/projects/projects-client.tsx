@@ -1,5 +1,10 @@
 "use client";
 
+import { ProjectDialog } from "@/components/projects/project-dialog";
+import { appPaths } from "@/config/paths-config";
+import { useProjects, useTasks } from "@/contexts/app/app-context";
+import { useAuth } from "@/lib/auth-context";
+import type { Project } from "@packages/domain/index";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,82 +20,56 @@ import { Button } from "@packages/ui/components/button";
 import { DataState } from "@packages/ui/components/data-state";
 import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import type { Project, Task } from "@packages/domain/index";
-import { appPaths } from "@/config/paths-config";
-import { useAuth } from "@/lib/auth-context";
-import {
-  deleteProject,
-  listProjects,
-  listTasks,
-  updateProject,
-} from "@/lib/db";
-import { ProjectDialog } from "@/components/projects/project-dialog";
+import { useMemo, useState } from "react";
 
 export function ProjectsClient() {
   const { user } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    projects: allProjects,
+    loading,
+    error,
+    reload,
+    update,
+    remove,
+  } = useProjects();
+  const { tasks: allTasks } = useTasks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const actionError = update.error || remove.error;
 
-  const reload = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await listProjects(user.$id);
-      setProjects(list);
-      const tasks: Task[] = await listTasks(user.$id);
-      const counts: Record<string, number> = {};
-      for (const t of tasks)
-        counts[t.projectId] = (counts[t.projectId] ?? 0) + 1;
-      setTaskCounts(counts);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't load projects.");
-    } finally {
-      setLoading(false);
+  const projects = useMemo(
+    () => allProjects.filter((p) => !p.deletedAt),
+    [allProjects],
+  );
+  const taskCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const t of allTasks) {
+      if (t.deletedAt) continue;
+      counts[t.projectId] = (counts[t.projectId] ?? 0) + 1;
     }
-  }, [user]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+    return counts;
+  }, [allTasks]);
 
   if (!user) return null;
 
   async function toggleArchive(project: Project) {
-    setActionError(null);
     const next = project.status === "ARCHIVED" ? "ACTIVE" : "ARCHIVED";
-    setProjects((prev) =>
-      prev.map((p) => (p.$id === project.$id ? { ...p, status: next } : p)),
-    );
     try {
-      const saved = await updateProject(project.$id, { status: next });
-      setProjects((prev) => prev.map((p) => (p.$id === saved.$id ? saved : p)));
-    } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Couldn't update the project.",
-      );
+      await update.run(project.$id, { status: next });
+    } catch {
+      // Surfaced via update.error from the hook.
     }
   }
 
   async function confirmDelete() {
-    if (!deleting || !user) return;
+    if (!deleting) return;
     const id = deleting.$id;
     setDeleting(null);
-    setActionError(null);
     try {
-      await deleteProject(user.$id, id);
-      setProjects((prev) => prev.filter((p) => p.$id !== id));
-    } catch (err) {
-      setActionError(
-        err instanceof Error ? err.message : "Couldn't delete the project.",
-      );
+      await remove.run(id);
+    } catch {
+      // Surfaced via remove.error from the hook.
     }
   }
 
@@ -205,16 +184,7 @@ export function ProjectsClient() {
       <ProjectDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        userId={user.$id}
         project={editing}
-        onSaved={(saved) => {
-          setProjects((prev) => {
-            const exists = prev.some((p) => p.$id === saved.$id);
-            return exists
-              ? prev.map((p) => (p.$id === saved.$id ? saved : p))
-              : [saved, ...prev];
-          });
-        }}
       />
 
       <AlertDialog

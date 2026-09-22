@@ -1,5 +1,7 @@
 "use client";
 
+import { useTasks } from "@/contexts/app/app-context";
+import type { Project, Task, TaskPriority } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
@@ -12,43 +14,42 @@ import {
 } from "@packages/ui/components/select";
 import { Textarea } from "@packages/ui/components/textarea";
 import { useEffect, useState } from "react";
-import type { Project, Task, TaskPriority } from "@packages/domain/index";
-import { createTask, updateTask } from "@/lib/db";
 
 const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH"];
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userId: string;
   projects: Project[];
   /** Edit target; null/undefined = create mode. */
   task?: Task | null;
   /** Lock the project picker (e.g. quick-add inside a project). */
   fixedProjectId?: string;
-  onSaved: (task: Task) => void;
+  onSaved?: (task: Task) => void;
 };
 
 export function TaskFormDialog({
   open,
   onOpenChange,
-  userId,
   projects,
   task,
   fixedProjectId,
   onSaved,
 }: Props) {
+  const { create, update } = useTasks();
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
   const [dueDate, setDueDate] = useState("");
   const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const saving = create.isLoading || update.isLoading;
+  const error = validationError || create.error || update.error;
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
+    setValidationError(null);
     setTitle(task?.title ?? "");
     setProjectId(task?.projectId ?? fixedProjectId ?? projects[0]?.$id ?? "");
     setPriority(task?.priority ?? "MEDIUM");
@@ -58,33 +59,30 @@ export function TaskFormDialog({
 
   async function handleSave() {
     if (!title.trim() || !projectId) {
-      setError("A title and a project are required.");
+      setValidationError("A title and a project are required.");
       return;
     }
-    setSaving(true);
-    setError(null);
+    setValidationError(null);
     try {
       const saved = task
-        ? await updateTask(task.$id, {
+        ? await update.run(task.$id, {
             title: title.trim(),
             projectId,
             priority,
             dueDate: dueDate || null,
             description: description.trim() || null,
           })
-        : await createTask(userId, {
+        : await create.run({
             title: title.trim(),
             projectId,
             priority,
             dueDate: dueDate || null,
             description: description.trim() || null,
           });
-      onSaved(saved);
+      onSaved?.(saved);
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save the task.");
-    } finally {
-      setSaving(false);
+    } catch {
+      // Surfaced via createError/updateError from the hook.
     }
   }
 

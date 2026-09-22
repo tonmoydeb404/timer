@@ -1,7 +1,7 @@
+import { cn } from "@packages/ui/lib/utils";
 import * as React from "react";
 import { Button } from "./button";
 import { Skeleton } from "./skeleton";
-import { cn } from "@packages/ui/lib/utils";
 
 type DataStateProps<T> = {
   /** True while the first load is in flight. */
@@ -20,6 +20,11 @@ type DataStateProps<T> = {
   onRetry?: () => void;
   /** Number of skeleton rows during loading. */
   skeletonCount?: number;
+  /**
+   * Custom loading UI, overriding the default skeleton rows. Pass a render
+   * function to repeat it `skeletonCount` times, or a plain node to render once.
+   */
+  loadingComponent?: React.ReactNode | ((index: number) => React.ReactNode);
   className?: string;
   children: (data: T[]) => React.ReactNode;
 };
@@ -37,11 +42,24 @@ export function DataState<T>({
   emptyHint,
   emptyAction,
   onRetry,
-  skeletonCount = 3,
+  skeletonCount = 1,
+  loadingComponent,
   className,
   children,
 }: DataStateProps<T>) {
   if (loading) {
+    if (typeof loadingComponent === "function") {
+      return (
+        <>
+          {Array.from({ length: skeletonCount }).map((_, i) => (
+            <React.Fragment key={i}>{loadingComponent(i)}</React.Fragment>
+          ))}
+        </>
+      );
+    }
+
+    if (loadingComponent) return <>{loadingComponent}</>;
+
     return (
       <div
         className={cn("grid gap-2", className)}

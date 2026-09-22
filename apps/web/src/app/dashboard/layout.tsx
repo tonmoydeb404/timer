@@ -1,4 +1,6 @@
 import { DashboardShell } from "@/components/dashboard-shell";
+import { AppDataProvider } from "@/contexts/app/app-context";
+import { SetupModal } from "@/views/dashboard/modals";
 
 export const metadata = {
   title: "Dashboard",
@@ -9,5 +11,10 @@ export default function DashboardLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <AppDataProvider>
+      <DashboardShell>{children}</DashboardShell>
+      <SetupModal />
+    </AppDataProvider>
+  );
 }

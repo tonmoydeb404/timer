@@ -1,5 +1,7 @@
 "use client";
 
+import { useTimeEntries } from "@/contexts/app/app-context";
+import type { EntryType, Task, TimeEntry } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { Label } from "@packages/ui/components/label";
@@ -12,12 +14,6 @@ import {
   SelectValue,
 } from "@packages/ui/components/select";
 import { useEffect, useState } from "react";
-import type {
-  EntryType,
-  Task,
-  TimeEntry,
-} from "@packages/domain/index";
-import { createTimeEntry, updateTimeEntry } from "@/lib/db";
 
 const TYPES: EntryType[] = ["WORK", "BREAK"];
 
@@ -41,31 +37,32 @@ export function localInputToIso(value: string): string | null {
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userId: string;
   tasks: Task[];
   /** Edit target; null/undefined = log-time mode. */
   entry?: TimeEntry | null;
-  onSaved: (entry: TimeEntry) => void;
+  onSaved?: (entry: TimeEntry) => void;
 };
 
 export function TimeEntryDialog({
   open,
   onOpenChange,
-  userId,
   tasks,
   entry,
   onSaved,
 }: Props) {
+  const { create, update } = useTimeEntries();
   const [taskId, setTaskId] = useState("");
   const [type, setType] = useState<EntryType>("WORK");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const saving = create.isLoading || update.isLoading;
+  const error = validationError || create.error || update.error;
 
   useEffect(() => {
     if (!open) return;
-    setError(null);
+    setValidationError(null);
     setTaskId(entry?.taskId ?? tasks[0]?.$id ?? "");
     setType(entry?.type ?? "WORK");
     setStart(isoToLocalInput(entry?.startedAt ?? null));
@@ -74,45 +71,45 @@ export function TimeEntryDialog({
 
   async function handleSave() {
     if (!taskId) {
-      setError("Pick a task for this entry.");
+      setValidationError("Pick a task for this entry.");
       return;
     }
     const startedAt = localInputToIso(start);
     if (!startedAt) {
-      setError("Start time is invalid.");
+      setValidationError("Start time is invalid.");
       return;
     }
     const endedAt = localInputToIso(end);
     if (entry && !endedAt) {
-      setError("End time is required — open entries can't sync yet.");
+      setValidationError("End time is required — open entries can't sync yet.");
       return;
     }
-    if (endedAt && new Date(endedAt).getTime() <= new Date(startedAt).getTime()) {
-      setError("End must be after start.");
+    if (
+      endedAt &&
+      new Date(endedAt).getTime() <= new Date(startedAt).getTime()
+    ) {
+      setValidationError("End must be after start.");
       return;
     }
-    setSaving(true);
-    setError(null);
+    setValidationError(null);
     try {
       const saved = entry
-        ? await updateTimeEntry(entry.$id, {
+        ? await update.run(entry.$id, {
             taskId,
             type,
             startedAt,
             endedAt,
           })
-        : await createTimeEntry(userId, {
+        : await create.run({
             taskId,
             type,
             startedAt,
             endedAt,
           });
-      onSaved(saved);
+      onSaved?.(saved);
       onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save the entry.");
-    } finally {
-      setSaving(false);
+    } catch {
+      // Surfaced via create.error/update.error from the hook.
     }
   }
 

@@ -1,22 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Project } from "@packages/domain/index";
-import { useAuth } from "@/lib/auth-context";
-import { listProjects } from "@/lib/db";
 import { TaskList } from "@/components/tasks/task-list";
+import { useProjects } from "@/contexts/app/app-context";
+import { useAuth } from "@/lib/auth-context";
 
 export function TasksClient() {
   const { user } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    listProjects(user.$id)
-      .then(setProjects)
-      .finally(() => setLoading(false));
-  }, [user]);
+  const { projects, loading } = useProjects();
+  const activeProjects = projects.filter((p) => !p.deletedAt);
 
   if (!user) return null;
 
@@ -31,7 +22,7 @@ export function TasksClient() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <TaskList userId={user.$id} projects={projects} />
+        <TaskList projects={activeProjects} />
       )}
     </div>
   );
