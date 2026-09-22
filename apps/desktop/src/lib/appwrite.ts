@@ -1,5 +1,5 @@
 import { Account, Client, Databases, OAuthProvider } from "appwrite";
-import { appwriteEndpoint, appwriteProjectId } from "./config";
+import { appwriteEndpoint, appwriteProjectId, desktopBridgeUrl } from "./config";
 
 // Appwrite access for the desktop webview, mirroring the web app: the SDK
 // owns the user session (cookies/localStorage inside the webview). Rust
@@ -44,12 +44,14 @@ export function getDatabases(): Databases | null {
  * Google OAuth login URL. Same shape the SDK's `createOAuth2Token` builds
  * (`{endpoint}/account/tokens/oauth2/{provider}?success&failure&project`),
  * but returned as a string so the caller can open it in the system browser
- * instead of navigating the webview.
+ * instead of navigating the webview. The success/failure target is the web
+ * bridge, which forwards to the timer:// scheme (Appwrite only redirects
+ * to registered https origins).
  */
 export function googleLoginUrl(): string {
   const url = new URL(`${appwriteEndpoint}/account/tokens/oauth2/google`);
-  url.searchParams.set("success", OAUTH_CALLBACK_URL);
-  url.searchParams.set("failure", OAUTH_CALLBACK_URL);
+  url.searchParams.set("success", desktopBridgeUrl);
+  url.searchParams.set("failure", desktopBridgeUrl);
   url.searchParams.set("project", appwriteProjectId);
   return url.toString();
 }

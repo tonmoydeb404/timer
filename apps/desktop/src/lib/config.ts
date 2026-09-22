@@ -13,3 +13,14 @@ export const appwriteEndpoint = requiredEnv(
 );
 
 export const appwriteProjectId = requiredEnv("VITE_APPWRITE_PROJECT_ID", "");
+
+// Base URL of the web app. The desktop OAuth flow lands on the web bridge
+// (`/auth/desktop`), which forwards to the timer:// scheme — Appwrite only
+// redirects to registered https origins. In dev this is the web dev server;
+// production desktop builds must bake the deployed web URL.
+export const webUrl = requiredEnv(
+  "VITE_WEB_URL",
+  "http://localhost:3010",
+).replace(/\/$/, "");
+
+export const desktopBridgeUrl = `${webUrl}/auth/desktop`;
