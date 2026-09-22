@@ -1,5 +1,8 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
+import { ensureUserSetup, getProfile, updateProfile } from "@/lib/db";
+import type { Profile } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import {
   Card,
@@ -11,14 +14,12 @@ import {
 import { Input } from "@packages/ui/components/input";
 import { Label } from "@packages/ui/components/label";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Profile } from "@packages/domain/index";
-import { useAuth } from "@/lib/auth-context";
-import { ensureUserSetup, getProfile, updateProfile } from "@/lib/db";
 
 function allTimeZones(): string[] {
   try {
-    const values = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
-      .supportedValuesOf?.("timeZone");
+    const values = (
+      Intl as unknown as { supportedValuesOf?: (k: string) => string[] }
+    ).supportedValuesOf?.("timeZone");
     if (values && values.length > 0) return values;
   } catch {
     // Fall through to the curated list.
@@ -85,7 +86,8 @@ export function SettingsClient() {
   if (!user) return null;
 
   const dirty =
-    profile !== null && (name.trim() !== profile.name || timezone !== profile.timezone);
+    profile !== null &&
+    (name.trim() !== profile.name || timezone !== profile.timezone);
 
   async function handleSave() {
     if (!profile) return;
@@ -118,7 +120,7 @@ export function SettingsClient() {
 
   return (
     <div className="grid max-w-2xl gap-4">
-      <div className="grid gap-1">
+      <div className="grid gap-1 py-10">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
           Profile and reporting timezone.
@@ -140,7 +142,8 @@ export function SettingsClient() {
             <CardHeader>
               <CardTitle className="text-sm font-medium">Profile</CardTitle>
               <CardDescription>
-                Shown across the dashboard; your login email can&apos;t be changed here.
+                Shown across the dashboard; your login email can&apos;t be
+                changed here.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
@@ -155,14 +158,21 @@ export function SettingsClient() {
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="settings-email">Email</Label>
-                <Input id="settings-email" value={user.email} disabled readOnly />
+                <Input
+                  id="settings-email"
+                  value={user.email}
+                  disabled
+                  readOnly
+                />
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm font-medium">Reporting timezone</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Reporting timezone
+              </CardTitle>
               <CardDescription>
                 Day boundaries for analytics and history. Timestamps stay in UTC
                 under the hood.
@@ -194,7 +204,11 @@ export function SettingsClient() {
           </Card>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {savedNote && <p className="text-sm text-emerald-700 dark:text-emerald-400">{savedNote}</p>}
+          {savedNote && (
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+              {savedNote}
+            </p>
+          )}
 
           <div>
             <Button onClick={handleSave} disabled={saving || !dirty}>

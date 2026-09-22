@@ -74,7 +74,6 @@ export const appPaths = {
   callback: "/auth/callback",
   dashboard: "/dashboard",
   projects: "/dashboard/projects",
-  projectDetails: (projectId: string) => `/dashboard/projects/${projectId}`,
   tasks: "/dashboard/tasks",
   time: "/dashboard/time",
   settings: "/dashboard/settings",

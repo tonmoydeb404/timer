@@ -188,7 +188,7 @@ export function TimeClient() {
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 py-10">
         <div className="grid gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Time</h1>
           <p className="text-sm text-muted-foreground">

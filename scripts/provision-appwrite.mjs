@@ -32,7 +32,12 @@ const DB_ID = "timer";
 const str = (key, size, required = false, def = undefined) => ({
   kind: "string",
   key,
-  payload: { key, size, required, ...(def !== undefined ? { default: def } : {}) },
+  payload: {
+    key,
+    size,
+    required,
+    ...(def !== undefined ? { default: def } : {}),
+  },
 });
 
 const dt = (key, required = false) => ({
@@ -86,6 +91,7 @@ const TABLES = [
     indexes: [
       idx("by_user", "key", ["userId"]),
       idx("by_user_status", "key", ["userId", "status"]),
+      idx("by_name", "fulltext", ["name"]),
     ],
   },
   {
@@ -105,6 +111,7 @@ const TABLES = [
     indexes: [
       idx("by_user_status", "key", ["userId", "status"]),
       idx("by_project", "key", ["projectId"]),
+      idx("by_title", "fulltext", ["title"]),
     ],
   },
   {

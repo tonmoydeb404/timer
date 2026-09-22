@@ -1,9 +1,9 @@
-import { TasksClient } from "./tasks-client";
+import { TasksView } from "@/views/dashboard/tasks";
 
 export const metadata = {
   title: "Tasks",
 };
 
 export default function TasksPage() {
-  return <TasksClient />;
+  return <TasksView />;
 }

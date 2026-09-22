@@ -1,0 +1,136 @@
+import type { Project } from "@packages/domain/index";
+import { Button } from "@packages/ui/components/button";
+import { Card, CardContent } from "@packages/ui/components/card";
+import { DataTable } from "@packages/ui/components/data-table";
+import { Input } from "@packages/ui/components/input";
+import { PaginationControl } from "@packages/ui/components/pagination-control";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import type { ProjectStatusFilter } from "../types";
+import { useProjectsData } from "../use-projects-data";
+import { ArchiveProjectModal } from "./archive-project-modal";
+import { CreateProjectModal } from "./create-project-modal";
+import { DeleteProjectModal } from "./delete-project-modal";
+import { buildProjectColumns } from "./project-columns";
+import { UpdateProjectModal } from "./update-project-modal";
+
+const STATUS_FILTERS: { value: ProjectStatusFilter; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "ARCHIVED", label: "Archived" },
+];
+
+export type ProjectListSectionHandle = {
+  openCreate: () => void;
+};
+
+export const ProjectListSection = forwardRef<ProjectListSectionHandle, object>(
+  function ProjectListSection(_props, ref) {
+    const {
+      projects,
+      total,
+      loading,
+      error,
+      taskCounts,
+      search,
+      setSearch,
+      statusFilter,
+      setStatusFilter,
+      page,
+      setPage,
+      pageCount,
+      reload,
+    } = useProjectsData();
+
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editing, setEditing] = useState<Project | null>(null);
+    const [deleting, setDeleting] = useState<Project | null>(null);
+    const [archiving, setArchiving] = useState<Project | null>(null);
+
+    useImperativeHandle(ref, () => ({
+      openCreate: () => setCreateOpen(true),
+    }));
+
+    const columns = useMemo(
+      () =>
+        buildProjectColumns({
+          taskCounts,
+          onEdit: setEditing,
+          onToggleArchive: setArchiving,
+          onDelete: setDeleting,
+        }),
+      [taskCounts],
+    );
+
+    return (
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search projects…"
+            className="h-9 max-w-56"
+          />
+          <div className="flex gap-1">
+            {STATUS_FILTERS.map((f) => (
+              <Button
+                key={f.value}
+                variant={statusFilter === f.value ? "default" : "ghost"}
+                size="default"
+                onClick={() => setStatusFilter(f.value)}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <Card>
+          <CardContent>
+            <DataTable
+              columns={columns}
+              data={projects}
+              loading={loading}
+              error={error}
+              onRetry={() => void reload()}
+              emptyTitle={
+                total === 0 ? "No projects yet" : "No matching projects"
+              }
+              emptyHint={
+                total === 0
+                  ? "Create the first one to get started."
+                  : "Try a different search or filter."
+              }
+            />
+          </CardContent>
+        </Card>
+
+        <PaginationControl
+          page={page}
+          pageCount={pageCount}
+          onPageChange={setPage}
+        />
+
+        <CreateProjectModal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={() => void reload()}
+        />
+        <UpdateProjectModal
+          project={editing}
+          onOpenChange={(open) => !open && setEditing(null)}
+          onUpdated={() => void reload()}
+        />
+        <DeleteProjectModal
+          project={deleting}
+          onOpenChange={(open) => !open && setDeleting(null)}
+          onDeleted={() => void reload()}
+        />
+        <ArchiveProjectModal
+          project={archiving}
+          onOpenChange={(open) => !open && setArchiving(null)}
+          onArchived={() => void reload()}
+        />
+      </div>
+    );
+  },
+);

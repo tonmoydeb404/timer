@@ -1,7 +1,8 @@
 "use client";
 
+import { ProjectSelect } from "@/components/selectors/project-select";
 import { useTasks } from "@/contexts/app/app-context";
-import type { Project, Task, TaskPriority } from "@packages/domain/index";
+import type { Task, TaskPriority } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
@@ -18,25 +19,14 @@ import { useEffect, useState } from "react";
 const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH"];
 
 type Props = {
-  open: boolean;
+  /** Edit target; modal is open whenever this is non-null. */
+  task: Task | null;
   onOpenChange: (open: boolean) => void;
-  projects: Project[];
-  /** Edit target; null/undefined = create mode. */
-  task?: Task | null;
-  /** Lock the project picker (e.g. quick-add inside a project). */
-  fixedProjectId?: string;
-  onSaved?: (task: Task) => void;
+  onUpdated: () => void;
 };
 
-export function TaskFormDialog({
-  open,
-  onOpenChange,
-  projects,
-  task,
-  fixedProjectId,
-  onSaved,
-}: Props) {
-  const { create, update } = useTasks();
+export function UpdateTaskModal({ task, onOpenChange, onUpdated }: Props) {
+  const { update } = useTasks();
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
@@ -44,60 +34,52 @@ export function TaskFormDialog({
   const [description, setDescription] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const saving = create.isLoading || update.isLoading;
-  const error = validationError || create.error || update.error;
-
   useEffect(() => {
-    if (!open) return;
+    if (!task) return;
     setValidationError(null);
-    setTitle(task?.title ?? "");
-    setProjectId(task?.projectId ?? fixedProjectId ?? projects[0]?.$id ?? "");
-    setPriority(task?.priority ?? "MEDIUM");
-    setDueDate(task?.dueDate ? task.dueDate.slice(0, 10) : "");
-    setDescription(task?.description ?? "");
-  }, [open, task, fixedProjectId, projects]);
+    setTitle(task.title);
+    setProjectId(task.projectId);
+    setPriority(task.priority);
+    setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : "");
+    setDescription(task.description ?? "");
+  }, [task]);
+
+  const error = validationError || update.error;
 
   async function handleSave() {
+    if (!task) return;
     if (!title.trim() || !projectId) {
       setValidationError("A title and a project are required.");
       return;
     }
     setValidationError(null);
     try {
-      const saved = task
-        ? await update.run(task.$id, {
-            title: title.trim(),
-            projectId,
-            priority,
-            dueDate: dueDate || null,
-            description: description.trim() || null,
-          })
-        : await create.run({
-            title: title.trim(),
-            projectId,
-            priority,
-            dueDate: dueDate || null,
-            description: description.trim() || null,
-          });
-      onSaved?.(saved);
+      await update.run(task.$id, {
+        title: title.trim(),
+        projectId,
+        priority,
+        dueDate: dueDate || null,
+        description: description.trim() || null,
+      });
       onOpenChange(false);
+      onUpdated();
     } catch {
-      // Surfaced via createError/updateError from the hook.
+      // Surfaced via update.error from the hook.
     }
   }
 
   return (
     <ResponsiveSheet
-      open={open}
+      open={task !== null}
       onOpenChange={onOpenChange}
-      title={task ? "Edit task" : "New task"}
+      title="Edit task"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : task ? "Save changes" : "Create task"}
+          <Button onClick={() => void handleSave()} disabled={update.isLoading}>
+            {update.isLoading ? "Saving…" : "Save changes"}
           </Button>
         </>
       }
@@ -109,22 +91,7 @@ export function TaskFormDialog({
         autoFocus
       />
       <div className="grid grid-cols-2 gap-3">
-        <Select
-          value={projectId}
-          onValueChange={(v) => setProjectId(v ?? "")}
-          disabled={Boolean(fixedProjectId)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Project" />
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((p) => (
-              <SelectItem key={p.$id} value={p.$id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ProjectSelect value={projectId} onValueChange={setProjectId} />
         <Select
           value={priority}
           onValueChange={(v) => setPriority(v as TaskPriority)}

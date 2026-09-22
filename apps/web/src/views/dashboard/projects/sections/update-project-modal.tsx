@@ -9,64 +9,62 @@ import { Textarea } from "@packages/ui/components/textarea";
 import { useEffect, useState } from "react";
 
 type Props = {
-  open: boolean;
+  /** Edit target; modal is open whenever this is non-null. */
+  project: Project | null;
   onOpenChange: (open: boolean) => void;
-  /** Edit target; null/undefined = create mode. */
-  project?: Project | null;
-  onSaved?: (project: Project) => void;
+  onUpdated: () => void;
 };
 
-export function ProjectDialog({ open, onOpenChange, project, onSaved }: Props) {
-  const { create, update } = useProjects();
+export function UpdateProjectModal({
+  project,
+  onOpenChange,
+  onUpdated,
+}: Props) {
+  const { update } = useProjects();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const saving = create.isLoading || update.isLoading;
-  const error = validationError || create.error || update.error;
-
   useEffect(() => {
-    if (!open) return;
+    if (!project) return;
     setValidationError(null);
-    setName(project?.name ?? "");
-    setDescription(project?.description ?? "");
-  }, [open, project]);
+    setName(project.name);
+    setDescription(project.description ?? "");
+  }, [project]);
+
+  const error = validationError || update.error;
 
   async function handleSave() {
+    if (!project) return;
     if (!name.trim()) {
       setValidationError("A project name is required.");
       return;
     }
     setValidationError(null);
     try {
-      const saved = project
-        ? await update.run(project.$id, {
-            name: name.trim(),
-            description: description.trim() || null,
-          })
-        : await create.run({
-            name: name.trim(),
-            description: description.trim() || null,
-          });
-      onSaved?.(saved);
+      await update.run(project.$id, {
+        name: name.trim(),
+        description: description.trim() || null,
+      });
       onOpenChange(false);
+      onUpdated();
     } catch {
-      // Surfaced via create.error/update.error from the hook.
+      // Surfaced via update.error from the hook.
     }
   }
 
   return (
     <ResponsiveSheet
-      open={open}
+      open={project !== null}
       onOpenChange={onOpenChange}
-      title={project ? "Rename project" : "New project"}
+      title="Rename project"
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : project ? "Save changes" : "Create project"}
+          <Button onClick={() => void handleSave()} disabled={update.isLoading}>
+            {update.isLoading ? "Saving…" : "Save changes"}
           </Button>
         </>
       }

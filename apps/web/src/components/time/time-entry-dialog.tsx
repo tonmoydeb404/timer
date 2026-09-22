@@ -1,5 +1,6 @@
 "use client";
 
+import { TaskSelect } from "@/components/selectors/task-select";
 import { useTimeEntries } from "@/contexts/app/app-context";
 import type { EntryType, Task, TimeEntry } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
@@ -132,18 +133,7 @@ export function TimeEntryDialog({
     >
       <div className="grid gap-1.5">
         <Label htmlFor="entry-task">Task</Label>
-        <Select value={taskId} onValueChange={(v) => setTaskId(v ?? "")}>
-          <SelectTrigger id="entry-task">
-            <SelectValue placeholder="Pick a task" />
-          </SelectTrigger>
-          <SelectContent>
-            {tasks.map((t) => (
-              <SelectItem key={t.$id} value={t.$id}>
-                {t.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <TaskSelect id="entry-task" value={taskId} onValueChange={setTaskId} />
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="entry-type">Type</Label>
