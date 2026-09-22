@@ -1,8 +1,10 @@
 import {
+  aggregateDayTotals,
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
   dayKey,
   entryDurationMs,
+  type DayTotal,
   type EntryType,
   type Profile,
   type Project,
@@ -655,6 +657,36 @@ export async function getTimeStats(
     if (docs.length < pageSize || offset >= res.total) break;
   }
   return { workedMs, breakMs, entryCount };
+}
+
+/**
+ * Per-day work/break totals for [from, to), for the "work per day" charts —
+ * paged through the same way as `getTimeStats` (Appwrite has no aggregate
+ * queries), then reduced client-side via `aggregateDayTotals`.
+ */
+export async function getDayTotals(
+  userId: string,
+  timeZone: string,
+  range: { from: string; to: string },
+): Promise<DayTotal[]> {
+  const db = requireDatabases();
+  const pageSize = 100;
+  let offset = 0;
+  const entries: TimeEntry[] = [];
+  for (;;) {
+    const res = await db.listDocuments(DB, COLLECTIONS.timeEntries, [
+      byUser(userId),
+      Query.greaterThanEqual("startedAt", range.from),
+      Query.lessThan("startedAt", range.to),
+      Query.limit(pageSize),
+      Query.offset(offset),
+    ]);
+    const docs = res.documents as unknown as Doc[];
+    entries.push(...docs.map(toTimeEntry));
+    offset += pageSize;
+    if (docs.length < pageSize || offset >= res.total) break;
+  }
+  return aggregateDayTotals(entries, timeZone);
 }
 
 export async function createTimeEntry(

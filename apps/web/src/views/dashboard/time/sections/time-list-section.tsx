@@ -7,11 +7,10 @@ import type { TimeEntry } from "@packages/domain/index";
 import { Accordion } from "@packages/ui/components/accordion";
 import { Button } from "@packages/ui/components/button";
 import { DataState } from "@packages/ui/components/data-state";
-import { Input } from "@packages/ui/components/input";
 import { PaginationControl } from "@packages/ui/components/pagination-control";
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react";
 import type { EntryTypeFilter } from "../types";
-import { useTimeDayGroups } from "../use-time-day-groups";
+import type { useTimeDayGroups } from "../use-time-day-groups";
 import { CreateTimeEntryModal } from "./create-time-entry-modal";
 import { DeleteTimeEntryModal } from "./delete-time-entry-modal";
 import { TimeDayGroup } from "./time-day-group";
@@ -27,9 +26,11 @@ export type TimeListSectionHandle = {
   openCreate: () => void;
 };
 
-export const TimeListSection = forwardRef<TimeListSectionHandle, object>(
-  function TimeListSection(_props, ref) {
-    const {
+type Props = ReturnType<typeof useTimeDayGroups>;
+
+export const TimeListSection = forwardRef<TimeListSectionHandle, Props>(
+  function TimeListSection(
+    {
       days,
       total,
       loading,
@@ -41,15 +42,15 @@ export const TimeListSection = forwardRef<TimeListSectionHandle, object>(
       setProjectFilter,
       taskFilter,
       setTaskFilter,
-      range,
-      setRange,
       page,
       setPage,
       pageCount,
       reload,
       refreshSignal,
       notifyChanged,
-    } = useTimeDayGroups();
+    },
+    ref,
+  ) {
     const { projects: allProjects } = useProjects();
 
     const projectName = useCallback(
@@ -96,25 +97,6 @@ export const TimeListSection = forwardRef<TimeListSectionHandle, object>(
               </Button>
             ))}
           </div>
-          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Input
-              type="date"
-              aria-label="From date"
-              value={range.from}
-              max={range.to}
-              onChange={(e) => setRange({ ...range, from: e.target.value })}
-              className="h-9 w-36"
-            />
-            <span>→</span>
-            <Input
-              type="date"
-              aria-label="To date"
-              value={range.to}
-              min={range.from}
-              onChange={(e) => setRange({ ...range, to: e.target.value })}
-              className="h-9 w-36"
-            />
-          </span>
         </div>
 
         <DataState
