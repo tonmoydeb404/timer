@@ -58,6 +58,8 @@ pub fn rebuild_menu(app: &AppHandle) {
                 false
             );
             separator!(menu, app);
+            item!(menu, app, "start", "Start Timer", true);
+            separator!(menu, app);
         }
         crate::timer::TimerStatus::Working | crate::timer::TimerStatus::Break => {
             let title = view
@@ -152,6 +154,10 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
         "switch" => {
             // The task picker lives in the Today screen: open the window and
             // ask the frontend to show it.
+            crate::show_window(app);
+            let _ = app.emit("timer://open-switcher", ());
+        }
+        "start" => {
             crate::show_window(app);
             let _ = app.emit("timer://open-switcher", ());
         }
