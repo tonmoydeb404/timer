@@ -2,12 +2,12 @@
 # Every value below is rewritten by scripts/sync-brand.mjs from brand.json.
 # Usage:
 # @brand:start usage
-#   irm https://raw.githubusercontent.com/your-username/my-app/main/setup/windows.ps1 | iex
+#   irm https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows.ps1 | iex
 # @brand:end usage
 $ErrorActionPreference = "Stop"
 
-$Repo = "your-username/my-app"
-$AppName = "My App"
+$Repo = "tonmoydeb404/tymar"
+$AppName = "Tymar"
 # Pinned by scripts/sync-brand.mjs on every release; avoids api.github.com
 # (rate limited to 60 requests/hour per IP, shared by every machine behind
 # the same network).

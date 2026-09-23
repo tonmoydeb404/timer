@@ -1,6 +1,6 @@
-# <!-- @brand:appName -->My App<!-- /@brand:appName --> Desktop
+# <!-- @brand:appName -->Tymar<!-- /@brand:appName --> Desktop
 
-<!-- @brand:descriptionLong -->My App is a cross-platform desktop app built with Tauri 2, React, and Rust. This placeholder description lives in brand.json and is propagated to every consumer file by scripts/sync-brand.mjs.<!-- /@brand:descriptionLong -->
+<!-- @brand:descriptionLong -->Tymar is a cross-platform desktop app built with Tauri 2, React, and Rust.<!-- /@brand:descriptionLong -->
 
 Part of the [monorepo](../../README.md). This package (`@apps/desktop`) holds both the React frontend (`src/`) and the Rust backend (`src-tauri/`).
 
@@ -91,13 +91,13 @@ cargo clippy              # lint
 
 ## Download
 
-Pre-built binaries: **<!-- @brand:downloadUrl -->https://github.com/your-username/my-app/releases/latest<!-- /@brand:downloadUrl -->**
+Pre-built binaries: **<!-- @brand:downloadUrl -->https://github.com/tonmoydeb404/tymar/releases/latest<!-- /@brand:downloadUrl -->**
 
 ## Links
 
-- Website: <!-- @brand:website -->https://example.com<!-- /@brand:website -->
-- Repository: <!-- @brand:repository -->https://github.com/your-username/my-app<!-- /@brand:repository -->
+- Website: <!-- @brand:website -->https://tonmoydeb.com<!-- /@brand:website -->
+- Repository: <!-- @brand:repository -->https://github.com/tonmoydeb404/tymar<!-- /@brand:repository -->
 
 ## License
 
-[MIT](../../LICENSE) — <!-- @brand:copyright -->Copyright (c) 2026 Your Name<!-- /@brand:copyright -->
+[MIT](../../LICENSE) — <!-- @brand:copyright -->Copyright (c) 2026 Tonmoy Deb<!-- /@brand:copyright -->

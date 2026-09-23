@@ -3,15 +3,15 @@
 # Every value below is rewritten by scripts/sync-brand.mjs from brand.json.
 # Usage:
 # @brand:start usage
-#   curl -fsSL https://raw.githubusercontent.com/your-username/my-app/main/setup/unix-uninstall.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix-uninstall.sh | sh
 # @brand:end usage
 set -e
 
-TAP="your-username/myapp"
-REPO="your-username/my-app"
-IDENTIFIER="com.example.myapp"
-APP_NAME="My App"
-PACKAGE="myapp"
+TAP="tonmoydeb404/tymar"
+REPO="tonmoydeb404/tymar"
+IDENTIFIER="com.tonmoydeb.tymar"
+APP_NAME="Tymar"
+PACKAGE="tymar"
 
 uninstall_macos() {
   echo "==> Quitting ${APP_NAME} if it is running..."

@@ -14,7 +14,7 @@ A production-ready GitHub template for cross-platform desktop apps:
 
 <!-- @brand:start badges -->
 
-[![Release](https://img.shields.io/github/v/release/your-username/my-app)](https://github.com/your-username/my-app/releases/latest)
+[![Release](https://img.shields.io/github/v/release/tonmoydeb404/tymar)](https://github.com/tonmoydeb404/tymar/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](#download)
 
@@ -84,7 +84,7 @@ artifacts, then updates the Homebrew cask with the new sha256.
 
 <!-- @brand:start downloadLink -->
 
-[Download the latest release &raquo;](https://github.com/your-username/my-app/releases/latest)
+[Download the latest release &raquo;](https://github.com/tonmoydeb404/tymar/releases/latest)
 
 <!-- @brand:end downloadLink -->
 

@@ -2229,7 +2229,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "myapp"
+name = "tymar"
 version = "0.1.0"
 dependencies = [
  "chrono",

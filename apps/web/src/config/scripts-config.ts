@@ -4,8 +4,8 @@
  */
 
 export const scriptUrls = {
-  "setupSh": "https://raw.githubusercontent.com/your-username/my-app/main/setup/unix.sh",
-  "setupPs1": "https://raw.githubusercontent.com/your-username/my-app/main/setup/windows.ps1",
-  "uninstallSh": "https://raw.githubusercontent.com/your-username/my-app/main/setup/unix-uninstall.sh",
-  "uninstallPs1": "https://raw.githubusercontent.com/your-username/my-app/main/setup/windows-uninstall.ps1"
+  "setupSh": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix.sh",
+  "setupPs1": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows.ps1",
+  "uninstallSh": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix-uninstall.sh",
+  "uninstallPs1": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows-uninstall.ps1"
 } as const;

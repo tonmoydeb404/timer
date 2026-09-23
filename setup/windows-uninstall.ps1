@@ -2,13 +2,13 @@
 # Every value below is rewritten by scripts/sync-brand.mjs from brand.json.
 # Usage:
 # @brand:start usage
-#   irm https://raw.githubusercontent.com/your-username/my-app/main/setup/windows-uninstall.ps1 | iex
+#   irm https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows-uninstall.ps1 | iex
 # @brand:end usage
 $ErrorActionPreference = "Stop"
 
-$Repo = "your-username/my-app"
-$Identifier = "com.example.myapp"
-$AppName = "My App"
+$Repo = "tonmoydeb404/tymar"
+$Identifier = "com.tonmoydeb.tymar"
+$AppName = "Tymar"
 
 Write-Host "==> Quitting $AppName if it is running..."
 Get-Process -Name $AppName -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue

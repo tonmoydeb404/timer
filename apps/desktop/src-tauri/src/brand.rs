@@ -2,17 +2,17 @@
 //! Source of truth: brand.json at the repo root. Run `pnpm sync-brand`.
 #![allow(dead_code)]
 
-pub const APP_NAME: &str = "My App";
-pub const SLUG: &str = "myapp";
-pub const IDENTIFIER: &str = "com.example.myapp";
-pub const DEVELOPER_NAME: &str = "Your Name";
-pub const WEBSITE: &str = "https://example.com";
-pub const REPOSITORY: &str = "https://github.com/your-username/my-app";
-pub const DOWNLOAD_URL: &str = "https://github.com/your-username/my-app/releases/latest";
-pub const LICENSE_URL: &str = "https://github.com/your-username/my-app/blob/main/LICENSE";
-pub const COPYRIGHT: &str = "Copyright (c) 2026 Your Name";
-pub const HOMEBREW_TAP: &str = "your-username/myapp";
-pub const SETUP_SCRIPT_URL: &str = "https://raw.githubusercontent.com/your-username/my-app/main/setup/unix.sh";
+pub const APP_NAME: &str = "Tymar";
+pub const SLUG: &str = "tymar";
+pub const IDENTIFIER: &str = "com.tonmoydeb.tymar";
+pub const DEVELOPER_NAME: &str = "Tonmoy Deb";
+pub const WEBSITE: &str = "https://tonmoydeb.com";
+pub const REPOSITORY: &str = "https://github.com/tonmoydeb404/tymar";
+pub const DOWNLOAD_URL: &str = "https://github.com/tonmoydeb404/tymar/releases/latest";
+pub const LICENSE_URL: &str = "https://github.com/tonmoydeb404/tymar/blob/main/LICENSE";
+pub const COPYRIGHT: &str = "Copyright (c) 2026 Tonmoy Deb";
+pub const HOMEBREW_TAP: &str = "tonmoydeb404/tymar";
+pub const SETUP_SCRIPT_URL: &str = "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix.sh";
 
 /// App version, read from Cargo.toml at compile time.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

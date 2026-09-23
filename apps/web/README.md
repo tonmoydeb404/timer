@@ -1,4 +1,4 @@
-# <!-- @brand:appName -->My App<!-- /@brand:appName --> Web
+# <!-- @brand:appName -->Tymar<!-- /@brand:appName --> Web
 
 The marketing/docs site for [the desktop app](../../README.md). This package (`apps/web`) is a Next.js (App Router) site: landing page, feature highlights, docs, changelog, download CTA, pricing, privacy/terms.
 
@@ -37,9 +37,9 @@ pnpm lint             # eslint --max-warnings 0
 
 ## Links
 
-- Live site: <!-- @brand:website -->https://example.com<!-- /@brand:website -->
-- Repository: <!-- @brand:repository -->https://github.com/your-username/my-app<!-- /@brand:repository -->
+- Live site: <!-- @brand:website -->https://tonmoydeb.com<!-- /@brand:website -->
+- Repository: <!-- @brand:repository -->https://github.com/tonmoydeb404/tymar<!-- /@brand:repository -->
 
 ## License
 
-[MIT](../../LICENSE) — <!-- @brand:copyright -->Copyright (c) 2026 Your Name<!-- /@brand:copyright -->
+[MIT](../../LICENSE) — <!-- @brand:copyright -->Copyright (c) 2026 Tonmoy Deb<!-- /@brand:copyright -->

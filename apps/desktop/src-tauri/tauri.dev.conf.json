@@ -1,5 +1,5 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "identifier": "com.example.myapp.dev",
-  "productName": "My App Dev"
+  "identifier": "com.tonmoydeb.tymar.dev",
+  "productName": "Tymar Dev"
 }

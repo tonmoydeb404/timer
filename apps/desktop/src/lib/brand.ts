@@ -4,30 +4,30 @@
  */
 
 export const brand = {
-  "appName": "My App",
-  "slug": "myapp",
-  "identifier": "com.example.myapp",
+  "appName": "Tymar",
+  "slug": "tymar",
+  "identifier": "com.tonmoydeb.tymar",
   "version": "0.1.0",
   "developer": {
-    "name": "Your Name",
-    "website": "https://example.com"
+    "name": "Tonmoy Deb",
+    "website": "https://tonmoydeb.com"
   },
-  "repository": "https://github.com/your-username/my-app",
-  "downloadUrl": "https://github.com/your-username/my-app/releases/latest",
-  "licenseUrl": "https://github.com/your-username/my-app/blob/main/LICENSE",
-  "updaterEndpoint": "https://github.com/your-username/my-app/releases/latest/download/latest.json",
+  "repository": "https://github.com/tonmoydeb404/tymar",
+  "downloadUrl": "https://github.com/tonmoydeb404/tymar/releases/latest",
+  "licenseUrl": "https://github.com/tonmoydeb404/tymar/blob/main/LICENSE",
+  "updaterEndpoint": "https://github.com/tonmoydeb404/tymar/releases/latest/download/latest.json",
   "scripts": {
-    "setupSh": "https://raw.githubusercontent.com/your-username/my-app/main/setup/unix.sh",
-    "setupPs1": "https://raw.githubusercontent.com/your-username/my-app/main/setup/windows.ps1",
-    "uninstallSh": "https://raw.githubusercontent.com/your-username/my-app/main/setup/unix-uninstall.sh",
-    "uninstallPs1": "https://raw.githubusercontent.com/your-username/my-app/main/setup/windows-uninstall.ps1"
+    "setupSh": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix.sh",
+    "setupPs1": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows.ps1",
+    "uninstallSh": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix-uninstall.sh",
+    "uninstallPs1": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows-uninstall.ps1"
   },
   "description": {
     "short": "A cross-platform desktop app built with Tauri.",
-    "long": "My App is a cross-platform desktop app built with Tauri 2, React, and Rust. This placeholder description lives in brand.json and is propagated to every consumer file by scripts/sync-brand.mjs."
+    "long": "Tymar is a cross-platform desktop app built with Tauri 2, React, and Rust."
   },
-  "copyright": "Copyright (c) 2026 Your Name",
-  "homebrewTap": "your-username/myapp"
+  "copyright": "Copyright (c) 2026 Tonmoy Deb",
+  "homebrewTap": "tonmoydeb404/tymar"
 } as const;
 
 export type Brand = typeof brand;

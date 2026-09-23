@@ -2,17 +2,17 @@
 # Installer for macOS (via Homebrew) and Ubuntu/Debian (via .deb).
 # Usage:
 # @brand:start usage
-#   curl -fsSL https://raw.githubusercontent.com/your-username/my-app/main/setup/unix.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/your-username/my-app/main/setup/unix.sh | sh -s -- v0.1.0
+#   curl -fsSL https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix.sh | sh -s -- v0.1.0
 # @brand:end usage
 set -e
 
 # Every value below is rewritten by scripts/sync-brand.mjs from brand.json.
-APP_NAME="My App"
-PACKAGE="myapp"
-TAP="your-username/myapp"
-TAP_URL="https://github.com/your-username/my-app.git"
-REPO="your-username/my-app"
+APP_NAME="Tymar"
+PACKAGE="tymar"
+TAP="tonmoydeb404/tymar"
+TAP_URL="https://github.com/tonmoydeb404/tymar.git"
+REPO="tonmoydeb404/tymar"
 # Optional version tag (e.g. "v2.0.3"); defaults to the pinned version below.
 # The default is rewritten by scripts/sync-brand.mjs on every release, so this
 # installer never calls api.github.com (rate limited to 60 requests/hour per

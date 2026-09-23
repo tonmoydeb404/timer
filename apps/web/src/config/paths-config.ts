@@ -12,12 +12,12 @@
 
 // @brand:generated-start
 export const externalUrls = {
-  site: "https://example.com",
-  appName: "My App",
+  site: "https://tonmoydeb.com",
+  appName: "Tymar",
   descriptionShort: "A cross-platform desktop app built with Tauri.",
-  download: "https://github.com/your-username/my-app/releases/latest",
-  repository: "https://github.com/your-username/my-app",
-  license: "https://github.com/your-username/my-app/blob/main/LICENSE",
+  download: "https://github.com/tonmoydeb404/tymar/releases/latest",
+  repository: "https://github.com/tonmoydeb404/tymar",
+  license: "https://github.com/tonmoydeb404/tymar/blob/main/LICENSE",
 } as const;
 // @brand:generated-end
 

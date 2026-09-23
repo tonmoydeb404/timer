@@ -3,18 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "My App desktop app — A cross-platform desktop app built with Tauri. Built with Tauri 2.",
+  "description": "Tymar desktop app — A cross-platform desktop app built with Tauri. Built with Tauri 2.",
   "license": "MIT",
-  "homepage": "https://example.com",
+  "homepage": "https://tonmoydeb.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/my-app.git",
+    "url": "https://github.com/tonmoydeb404/tymar.git",
     "directory": "apps/desktop"
   },
   "keywords": [
     "tauri",
     "desktop",
-    "myapp"
+    "tymar"
   ],
   "scripts": {
     "dev": "tauri dev --config src-tauri/tauri.dev.conf.json",

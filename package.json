@@ -1,19 +1,19 @@
 {
-  "name": "myapp",
+  "name": "tymar",
   "version": "0.1.0",
   "private": true,
-  "description": "My App — A cross-platform desktop app built with Tauri.",
+  "description": "Tymar — A cross-platform desktop app built with Tauri.",
   "license": "MIT",
-  "homepage": "https://example.com",
+  "homepage": "https://tonmoydeb.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/my-app.git"
+    "url": "https://github.com/tonmoydeb404/tymar.git"
   },
   "keywords": [
     "tauri",
     "desktop-app",
     "template",
-    "myapp"
+    "tymar"
   ],
   "scripts": {
     "build": "turbo run build",

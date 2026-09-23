@@ -37,10 +37,10 @@
     "eslint": "^9",
     "typescript": "^5"
   },
-  "description": "My App website — A cross-platform desktop app built with Tauri.",
+  "description": "Tymar website — A cross-platform desktop app built with Tauri.",
   "keywords": [
     "nextjs",
     "website",
-    "myapp"
+    "tymar"
   ]
 }
