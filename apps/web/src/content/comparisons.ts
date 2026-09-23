@@ -21,50 +21,66 @@ export type Comparison = {
 export const getComparison = (slug: string) =>
   comparisons.find((c) => c.slug === slug);
 
-// Placeholder comparison ("alternatives") pages — an SEO pattern comparing
-// your app with adjacent tools. Replace `app` column values with your app's
-// real answers, or delete the /alternatives route entirely.
+// Comparison ("alternatives") pages — an SEO pattern comparing Tymar with
+// adjacent tools. Keep the answers honest: where the other tool wins, say so.
 export const comparisons: Comparison[] = [
   {
-    slug: "competitor-one",
-    tool: "Competitor One",
-    h1: "Your app vs Competitor One",
-    metaTitle: "Your app vs Competitor One — which is right for you?",
+    slug: "toggl-track",
+    tool: "Toggl Track",
+    h1: "Tymar vs Toggl Track",
+    metaTitle: "Tymar vs Toggl Track — which is right for you?",
     metaDescription:
-      "A placeholder comparison page. Describe where your app wins and where the other tool is the better choice.",
+      "Toggl Track is a full team time-tracking platform; Tymar is a minimal, local-first tracker that lives in your tray. Compare both honestly.",
     intro:
-      "Describe what Competitor One is good at, fairly, before drawing the contrast.",
+      "Toggl Track is one of the most polished time trackers around, with deep team features, billing integrations, and reporting. That breadth is exactly the difference: Toggl is built for teams and billables, Tymar is built for one person who wants their day accounted for without managing another workspace.",
     appPitch:
-      "Describe what your app does differently and for whom that difference matters.",
-    bestForApp: "Summarize the user who should pick your app.",
-    bestForTool: "Summarize the user who should pick the other tool.",
+      "Tymar strips time tracking down to the loop that matters: pick a task, start the timer from the tray, take breaks without thinking, and read your history at the end of the day. There's no workspace to set up, no plan to pick, and the source is fully open.",
+    bestForApp:
+      "You track your own focus time, want it out of the way in the system tray, and prefer a free, open-source app over a hosted platform.",
+    bestForTool:
+      "You need team timesheets, client billing, rich reports, or integrations with project-management tools — Toggl's platform features are genuinely worth paying for.",
     table: [
       {
-        capability: "Core capability",
-        app: "Yes",
-        other: "Yes",
+        capability: "Price",
+        app: "Free, MIT",
+        other: "Free tier; paid plans for features",
       },
       {
-        capability: "Differentiator",
-        app: "Yes",
-        other: "No",
+        capability: "Source code",
+        app: "Open source (MIT)",
+        other: "Proprietary",
+      },
+      {
+        capability: "Data storage",
+        app: "Local-first with account sync",
+        other: "Cloud-hosted",
+      },
+      {
+        capability: "Tray-first tracking",
+        app: "Yes — core design",
+        other: "Supported via apps and extensions",
+      },
+      {
+        capability: "Team timesheets & billing",
+        app: "No",
+        other: "Yes",
       },
       {
         capability: "Platforms",
         app: "macOS, Windows, Linux",
-        other: "Describe",
-      },
-      {
-        capability: "Price",
-        app: "Free, MIT",
-        other: "Describe",
+        other: "macOS, Windows, Linux, iOS, Android, web",
       },
     ],
     faq: [
       {
-        question: "A common question about the comparison?",
+        question: "Can I migrate from Toggl Track to Tymar?",
         answer:
-          "An honest, specific answer. Honest comparisons convert better than salesy ones.",
+          "There's no one-click importer today. Most of Tymar's value is built up going forward — create your projects and tasks once, and future sessions are attributed automatically.",
+      },
+      {
+        question: "Does Tymar replace Toggl for teams?",
+        answer:
+          "No. Tymar deliberately has no team workspaces, approvals, or billing. If you track time for invoicing across a team, Toggl is the better tool for that job.",
       },
     ],
   },

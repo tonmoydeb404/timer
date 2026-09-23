@@ -28,7 +28,7 @@ type AppContextValue = {
   signingIn: boolean;
   signIn: () => Promise<SignInResult>;
   /**
-   * Dev fallback: paste the sign-in link (the `timer://auth?...` deep link
+   * Dev fallback: paste the sign-in link (the `tymar://auth?...` deep link
    * or the `/auth/desktop?...` bridge URL) when the OS can't route the
    * scheme back to an uninstalled dev binary. Parses userId+secret out of
    * any pasted URL and creates the session.

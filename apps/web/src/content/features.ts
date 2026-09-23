@@ -4,30 +4,29 @@ export type Feature = {
   metaDescription: string;
 };
 
-// Placeholder feature pages — replace with your app's real features.
 export const features: Feature[] = [
   {
-    slug: "feature-one",
-    title: "Feature one",
+    slug: "one-click-tracking",
+    title: "One-click tracking",
     metaDescription:
-      "A one-to-two sentence SEO description of feature one, shown in meta tags and search results.",
+      "Start, stop, and switch work sessions from the system tray. Tymar keeps tracking while the window stays out of your way.",
   },
   {
-    slug: "feature-two",
-    title: "Feature two",
+    slug: "projects-and-tasks",
+    title: "Projects and tasks",
     metaDescription:
-      "A one-to-two sentence SEO description of feature two, shown in meta tags and search results.",
+      "Organize time under projects and tasks, switch context without losing the running session, and keep every entry attributed.",
   },
   {
-    slug: "feature-three",
-    title: "Feature three",
+    slug: "breaks",
+    title: "Break tracking",
     metaDescription:
-      "A one-to-two sentence SEO description of feature three, shown in meta tags and search results.",
+      "Take a break with one click. Tymar records break time separately from focus time so your day adds up honestly.",
   },
   {
-    slug: "feature-four",
-    title: "Feature four",
+    slug: "local-first",
+    title: "Local-first with sync",
     metaDescription:
-      "A one-to-two sentence SEO description of feature four, shown in meta tags and search results.",
+      "Session state and settings stay in a local SQLite database. Sign in to sync projects, tasks, and history across devices.",
   },
 ];

@@ -108,7 +108,7 @@ export function ComparisonView({ comparison }: { comparison: Comparison }) {
         className="mt-12"
         showSourceButton={false}
         title={`Try ${APP_NAME} instead of ${comparison.tool}`}
-        description="Free and open source. Replace this CTA copy with your app's pitch."
+        description={`Free, open source, and tray-first. See how your day adds up with ${APP_NAME}.`}
       />
     </PageShell>
   );

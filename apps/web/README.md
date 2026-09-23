@@ -1,45 +1,27 @@
-# <!-- @brand:appName -->Tymar<!-- /@brand:appName --> Web
+# @apps/web
 
-The marketing/docs site for [the desktop app](../../README.md). This package (`apps/web`) is a Next.js (App Router) site: landing page, feature highlights, docs, changelog, download CTA, pricing, privacy/terms.
+Next.js marketing site for Tymar, plus the authenticated web dashboard.
 
-All copy lives in `src/content/*.ts` — placeholder content is in place; replace it with your product's copy.
+## Where things live
 
----
+- **Marketing copy** — `src/content/`:
+  - `homepage.ts` — hero, capabilities, features, workflow, FAQ, footer
+  - `features.ts` — the /features index entries
+  - `docs.ts` — the docs pages rendered at /docs/[slug]
+  - `comparisons.ts` — the /alternatives comparison pages
+  - `changelog.ts` — the release timeline at /changelog (newest first)
+- **Legal copy** — `src/views/privacy/sections/` and `src/views/terms/sections/`
+- **Routes & URLs** — `src/config/paths-config.ts` (generated brand values are
+  between the `@brand:generated-start/end` markers; run `pnpm sync-brand` after
+  changing `brand.json`)
+- **Downloads page** — `src/views/download/sections/` (install scripts come
+  from `brand.json` via `src/config/scripts-config.ts`)
 
-## Tech stack
-
-- **Framework:** [Next.js](https://nextjs.org/) (App Router) + React 19
-- **Language:** TypeScript
-- **Styling:** Tailwind v4 (PostCSS)
-- **UI:** shadcn/ui primitives and shared components from [`@packages/ui`](../../packages/ui)
-- **Fonts:** wired in `src/app/layout.tsx`
-- **Theming:** `next-themes`, dark-first via a no-FOUC inline script
-
-## Run commands
-
-Run from the **repository root** (this is a pnpm workspace):
-
-```sh
-pnpm install          # install all workspace dependencies
-pnpm dev:web          # Next.js dev server at http://localhost:3010
-pnpm build            # production build (turbo routes to this package)
-```
-
-Or run from within `apps/web`:
+## Development
 
 ```sh
-pnpm dev              # next dev -p 3010
-pnpm build            # next build
-pnpm start            # next start (serves the production build)
-pnpm check-types      # tsc --noEmit
-pnpm lint             # eslint --max-warnings 0
+pnpm dev:web
 ```
 
-## Links
-
-- Live site: <!-- @brand:website -->https://tonmoydeb.com<!-- /@brand:website -->
-- Repository: <!-- @brand:repository -->https://github.com/tonmoydeb404/tymar<!-- /@brand:repository -->
-
-## License
-
-[MIT](../../LICENSE) — <!-- @brand:copyright -->Copyright (c) 2026 Tonmoy Deb<!-- /@brand:copyright -->
+Requires the Appwrite environment variables from `.env` — see the repo root
+README and `provision:appwrite` script for setup.

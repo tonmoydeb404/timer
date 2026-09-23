@@ -1,6 +1,6 @@
 import { PageShell } from "@/components/page-shell";
 import { ChangesSection } from "./sections/changes-section";
-import { CommandsSection } from "./sections/commands-section";
+import { ContentSection } from "./sections/content-section";
 import { LicenseSection } from "./sections/license-section";
 import { LocalFirstSection } from "./sections/local-first-section";
 import { NoWarrantySection } from "./sections/no-warranty-section";
@@ -12,7 +12,7 @@ export function TermsView() {
       <TermsIntroSection />
       <LicenseSection />
       <NoWarrantySection />
-      <CommandsSection />
+      <ContentSection />
       <LocalFirstSection />
       <ChangesSection />
     </PageShell>

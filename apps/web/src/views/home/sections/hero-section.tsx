@@ -15,11 +15,11 @@ export function HeroSection() {
           id="hero-title"
           className="text-3xl font-medium tracking-tight text-balance md:text-5xl"
         >
-          Your commands, one tray click away
+          Time tracking that lives in your tray
         </h1>
         <p className="max-w-lg text-lg leading-relaxed text-muted-foreground text-pretty">
-          Save the shell commands you use every day, run them without opening a
-          terminal, schedule recurring work, and keep every result in one quiet
+          Start a work session with one click, take breaks without losing
+          your thread, and see exactly where the day went — in one quiet
           desktop app.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">

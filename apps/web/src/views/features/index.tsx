@@ -13,11 +13,11 @@ export function FeaturesView() {
         ]}
       />
       <h1 className="mt-6 text-3xl font-medium tracking-tight md:text-4xl">
-        Everything a saved command needs
+        Everything a tracked day needs
       </h1>
       <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
-        From the tray click to the run history, each feature keeps repeatable
-        shell work organized and out of the terminal.
+        From the tray click to the end-of-day history, each feature keeps
+        your time accounted for without asking for attention.
       </p>
 
       <ul className="mt-10 space-y-4">

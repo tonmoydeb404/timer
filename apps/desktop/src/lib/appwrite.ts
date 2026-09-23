@@ -1,12 +1,14 @@
 import { Account, Client, Databases, OAuthProvider } from "appwrite";
 import { appwriteEndpoint, appwriteProjectId, desktopBridgeUrl } from "./config";
+import { brand } from "./brand";
 
 // Appwrite access for the desktop webview, mirroring the web app: the SDK
 // owns the user session (cookies/localStorage inside the webview). Rust
 // performs no network calls — it only persists local timer state.
 
-// Custom scheme the OS routes back to this app after browser OAuth.
-export const OAUTH_SCHEME = "timer";
+// Custom scheme the OS routes back to this app after browser OAuth
+// (registered in tauri.conf.json via sync-brand).
+export const OAUTH_SCHEME = brand.slug;
 export const OAUTH_CALLBACK_URL = `${OAUTH_SCHEME}://auth`;
 
 let client: Client | null | undefined;
@@ -45,7 +47,7 @@ export function getDatabases(): Databases | null {
  * (`{endpoint}/account/tokens/oauth2/{provider}?success&failure&project`),
  * but returned as a string so the caller can open it in the system browser
  * instead of navigating the webview. The success/failure target is the web
- * bridge, which forwards to the timer:// scheme (Appwrite only redirects
+ * bridge, which forwards to the tymar:// scheme (Appwrite only redirects
  * to registered https origins).
  */
 export function googleLoginUrl(): string {

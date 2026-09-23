@@ -7,7 +7,8 @@ export function LatestBuildSection() {
     <section className="mt-16 rounded-lg bg-muted p-6">
       <h2 className="text-lg font-medium">Get the latest build</h2>
       <p className="mt-2 max-w-xl leading-7 text-muted-foreground">
-        Pre-built binaries for macOS and Windows are on GitHub Releases.
+        Pre-built binaries for macOS, Windows, and Linux are on GitHub
+        Releases.
       </p>
       <a
         href={sitePaths.download}

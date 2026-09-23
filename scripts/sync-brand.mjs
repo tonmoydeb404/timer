@@ -6,7 +6,7 @@
  * This script propagates those values into every consumer file:
  *   - structured JSON/TOML configs (tauri.conf.json, package.json, Cargo.toml)
  *   - generated typed wrappers (brand.ts, brand.rs, scripts-config.ts)
- *   - token-marked prose (README.md, llms.txt, pricing.md, paths-config.ts)
+ *   - token-marked prose (README.md, llms.txt, paths-config.ts)
  *   - line-keyed shell/ruby configs (setup.sh, setup.ps1, the Homebrew cask)
  *
  * Derived values (all computed from brand.json — nothing else to keep in sync):
@@ -351,7 +351,7 @@ rootPkg.version = brand.version;
 rootPkg.description = `${brand.appName} — ${brand.description.short}`;
 rootPkg.homepage = brand.developer.website;
 rootPkg.repository.url = repoGit;
-rootPkg.keywords = ["tauri", "desktop-app", "template", brand.slug];
+rootPkg.keywords = ["tauri", "desktop-app", brand.slug];
 
 const webPkg = JSON.parse(read("apps/web/package.json"));
 webPkg.version = brand.version;
@@ -364,6 +364,7 @@ tauriConf.version = brand.version;
 tauriConf.identifier = brand.identifier;
 tauriConf.app.windows[0].title = brand.appName;
 tauriConf.plugins.updater.endpoints[0] = brand.updaterEndpoint;
+tauriConf.plugins["deep-link"].desktop.schemes = [brand.slug];
 tauriConf.bundle.publisher = brand.developer.name;
 tauriConf.bundle.copyright = brand.copyright;
 tauriConf.bundle.shortDescription = brand.description.short;
@@ -572,7 +573,6 @@ const readme = applyBlock(
 const desktopReadme = applyInlineMarkers(read("apps/desktop/README.md"));
 const webReadme = applyInlineMarkers(read("apps/web/README.md"));
 const llmsTxt = applyInlineMarkers(read("apps/web/public/llms.txt"));
-const pricingMd = applyInlineMarkers(read("apps/web/public/pricing.md"));
 
 // ---------------------------------------------------------------------------
 // apply
@@ -601,7 +601,6 @@ const targets = {
   "apps/desktop/README.md": desktopReadme,
   "apps/web/README.md": webReadme,
   "apps/web/public/llms.txt": llmsTxt,
-  "apps/web/public/pricing.md": pricingMd,
 };
 
 const drift = [];

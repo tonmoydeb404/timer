@@ -1,8 +1,8 @@
 import {
-  CalendarClock,
-  History,
-  Laptop,
-  MousePointerClick,
+  Coffee,
+  FolderKanban,
+  ShieldCheck,
+  Timer,
 } from "lucide-react";
 
 import { SectionHeading } from "@/components/section-heading";
@@ -15,10 +15,10 @@ import {
 } from "@packages/ui/components/card";
 
 const capabilityIcons = {
-  mouse: MousePointerClick,
-  laptop: Laptop,
-  calendar: CalendarClock,
-  history: History,
+  timer: Timer,
+  folder: FolderKanban,
+  coffee: Coffee,
+  shield: ShieldCheck,
 } as const;
 
 export function CapabilitiesSection() {
@@ -26,8 +26,8 @@ export function CapabilitiesSection() {
     <section aria-labelledby="capabilities-title" className="container py-24">
       <SectionHeading
         id="capabilities-title"
-        title="Made for commands worth saving"
-        description="What your app does for people, in one sentence."
+        title="Built for focused work"
+        description="Tymar tracks work and break sessions from the system tray, organizes them under projects and tasks, and keeps a history you can trust."
       />
       <div className="grid gap-4 sm:grid-cols-2">
         {capabilities.map((capability) => {

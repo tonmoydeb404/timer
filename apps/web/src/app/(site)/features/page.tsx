@@ -7,7 +7,7 @@ import { APP_NAME } from "@/content/homepage";
 export const metadata: Metadata = {
   title: `Features — ${APP_NAME}`,
   description:
-    "Tray execution, command groups and search, scheduling, and full run history. Everything a saved shell command needs.",
+    "One-click tracking from the tray, projects and tasks, break tracking, and a searchable history. Everything a tracked day needs.",
   alternates: { canonical: sitePaths.features },
 };
 

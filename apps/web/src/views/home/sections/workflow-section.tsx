@@ -12,8 +12,8 @@ export function WorkflowSection() {
     >
       <SectionHeading
         id="workflow-title"
-        title="Save it once. Stop recalling it."
-        description="A short loop for the command-line work that repeats throughout the week."
+        title="Pick a task. Press start. That's it."
+        description="The whole loop fits between two sips of coffee."
       />
       <Card>
         <CardContent className="grid gap-8 py-2 md:grid-cols-3 md:gap-0">
@@ -37,21 +37,15 @@ export function WorkflowSection() {
       <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-muted-foreground">
         <span className="flex items-center gap-2">
           <kbd className="rounded-md border bg-muted px-2 py-1 text-xs text-foreground">
+            Tray icon
+          </kbd>
+          Start, stop, and breaks
+        </span>
+        <span className="flex items-center gap-2">
+          <kbd className="rounded-md border bg-muted px-2 py-1 text-xs text-foreground">
             ⌘/Ctrl K
           </kbd>
-          Focus search
-        </span>
-        <span className="flex items-center gap-2">
-          <kbd className="rounded-md border bg-muted px-2 py-1 text-xs text-foreground">
-            ↑ ↓
-          </kbd>
-          Select a command
-        </span>
-        <span className="flex items-center gap-2">
-          <kbd className="rounded-md border bg-muted px-2 py-1 text-xs text-foreground">
-            Enter
-          </kbd>
-          Run selection
+          Command palette
         </span>
       </div>
     </section>

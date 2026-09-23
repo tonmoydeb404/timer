@@ -7,8 +7,8 @@ import { appPaths } from "@/config/paths-config";
 
 // Bridge for desktop OAuth: Appwrite only redirects to registered https
 // origins, so the desktop flow lands here first and hops to the app's
-// `timer://` scheme, which the OS routes back to the desktop client.
-const DESKTOP_SCHEME_URL = "timer://auth";
+// `tymar://` scheme, which the OS routes back to the desktop client.
+const DESKTOP_SCHEME_URL = "tymar://auth";
 
 export function DesktopBridge() {
   const searchParams = useSearchParams();

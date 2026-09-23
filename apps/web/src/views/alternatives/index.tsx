@@ -18,8 +18,8 @@ export function AlternativesView() {
         How {APP_NAME} compares
       </h1>
       <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
-        {APP_NAME} compared to the adjacent tools your audience might use
-        today. Comparison pages are defined in src/content/comparisons.ts.
+        {APP_NAME} compared to tools you might already use — honestly, and
+        with clear pointers on when the other tool is the better fit.
       </p>
 
       <ul className="mt-10 space-y-4">

@@ -34,7 +34,7 @@
     "deep-link": {
       "desktop": {
         "schemes": [
-          "timer"
+          "tymar"
         ]
       }
     },

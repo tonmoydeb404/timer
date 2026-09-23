@@ -62,20 +62,20 @@ export function onUpdateAvailable(
 export function onTimerChanged(
   callback: (payload: TimerView) => void,
 ): Promise<UnlistenFn> {
-  return listen<TimerView>("timer://changed", (event) =>
+  return listen<TimerView>("tymar://changed", (event) =>
     callback(event.payload),
   );
 }
 
 export function onOpenSwitcher(callback: () => void): Promise<UnlistenFn> {
-  return listen("timer://open-switcher", () => callback());
+  return listen("tymar://open-switcher", () => callback());
 }
 
 // Deep-link URLs forwarded by the single-instance guard (Windows/Linux).
 export function onDeepLinkEvent(
   callback: (urls: string[]) => void,
 ): Promise<UnlistenFn> {
-  return listen<string[]>("timer://deep-link", (event) =>
+  return listen<string[]>("tymar://deep-link", (event) =>
     callback(event.payload),
   );
 }

@@ -3,8 +3,9 @@ use std::sync::Mutex;
 
 use rusqlite::Connection;
 
-/// Shared state managed by Tauri. Extend with whatever your app needs
-/// (caches, background workers, connections…).
+/// Shared state managed by Tauri: the SQLite connection for settings, the
+/// lock that serializes timer mutations, and the app data directory where
+/// the timer state file and logs live.
 #[allow(dead_code)]
 pub struct AppState {
     pub db: Mutex<Connection>,

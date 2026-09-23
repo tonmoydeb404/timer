@@ -140,7 +140,7 @@ export function LoginScreen() {
                 void handlePasteLink();
               }
             }}
-            placeholder="timer://auth?userId=…&secret=…"
+            placeholder="tymar://auth?userId=…&secret=…"
             autoComplete="off"
             spellCheck={false}
             aria-label="Sign-in link"

@@ -33,7 +33,7 @@ export function SiteMobileMenu() {
           <DrawerHeader>
             <DrawerTitle>{APP_NAME}</DrawerTitle>
             <DrawerDescription>
-              Replace with your app&apos;s tagline.
+              Effortless time tracking for focused work.
             </DrawerDescription>
           </DrawerHeader>
           <nav className="flex flex-col px-4" aria-label="Mobile navigation">

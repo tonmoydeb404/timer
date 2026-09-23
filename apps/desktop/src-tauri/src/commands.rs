@@ -31,7 +31,7 @@ async fn mutate_timer(
     crate::timer::save(&state.app_data_dir, &store).map_err(map_err)?;
 
     let view = crate::timer::view(&store, crate::timer::now_ms());
-    let _ = app.emit("timer://changed", &view);
+    let _ = app.emit("tymar://changed", &view);
     crate::tray::rebuild_menu(app);
     Ok(view)
 }
@@ -59,7 +59,7 @@ pub async fn ack_entries(
     crate::timer::save(&state.app_data_dir, &store).map_err(map_err)?;
 
     let view = crate::timer::view(&store, crate::timer::now_ms());
-    let _ = app.emit("timer://changed", &view);
+    let _ = app.emit("tymar://changed", &view);
     crate::tray::rebuild_menu(&app);
     Ok(view)
 }

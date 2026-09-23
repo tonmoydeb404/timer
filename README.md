@@ -1,16 +1,8 @@
-# tauri-desktop-template
+# Tymar
 
-A production-ready GitHub template for cross-platform desktop apps:
-
-- **Tauri 2** (Rust backend) + **React 19** + **TypeScript** + **Tailwind v4** (Vite)
-- **pnpm + Turborepo** monorepo with a shared **shadcn-style UI kit** (`packages/ui`)
-- **Optional Next.js marketing/docs site** (`apps/web`)
-- **Single-source branding** — `brand.json` drives the app name, identifier,
-  version, repo URLs, and more across ~25 consumer files via `pnpm sync-brand`
-- **Release tooling** — 3-platform CI (macOS dmg / Linux deb / Windows msi+exe),
-  built-in updater, Homebrew cask automation, curl|sh installers
-- **Desktop app plumbing** — system tray, autostart, hide-to-tray, dark/light
-  theme, welcome/update dialogs, SQLite + migrations skeleton
+Effortless time tracking for focused work — a minimal, powerful time tracker
+for macOS, Windows, and Linux. Start a session from the system tray, take
+breaks without losing your thread, and let Tymar keep the record.
 
 <!-- @brand:start badges -->
 
@@ -20,58 +12,77 @@ A production-ready GitHub template for cross-platform desktop apps:
 
 <!-- @brand:end badges -->
 
-## Quick start
+## Features
 
-1. Click **"Use this template"** → create your new repository.
-2. Clone it and scaffold your app's identity:
+- **One-click tracking** — start, stop, switch, and take breaks from the tray
+  menu; a compact always-on-top window keeps the session visible
+- **Projects and tasks** — organize entries by project and task, with quick
+  search and a command palette (⌘/Ctrl K)
+- **Local-first** — session state and settings live on your device in SQLite;
+  sign in to sync projects, tasks, and history
+- **Cross-platform** — native builds for macOS (Apple Silicon), Windows (x64),
+  and Linux (deb)
+- **Automatic updates** — built-in updater checks GitHub Releases and lets you
+  install new versions with one click
 
-   ```sh
-   pnpm install
-   pnpm init-app        # asks name/owner/etc, rewrites brand.json + all consumers
-   ```
+## Download
 
-3. Replace the placeholder icons with yours:
+<!-- @brand:start downloadLink -->
 
-   ```sh
-   pnpm --filter @apps/desktop tauri icon path/to/your-icon.png
-   ```
+[Download the latest release &raquo;](https://github.com/tonmoydeb404/tymar/releases/latest)
 
-4. Run it:
+<!-- @brand:end downloadLink -->
 
-   ```sh
-   pnpm dev:desktop
-   ```
+Or install from the terminal:
 
-> Full walkthrough (updater keys, GitHub secrets, releasing, Homebrew):
-> **[docs/TEMPLATE_GUIDE.md](docs/TEMPLATE_GUIDE.md)**
+```sh
+# macOS (Apple Silicon) and Linux (x86_64 deb)
+curl -fsSL https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/unix.sh | sh
 
-## What's inside
+# Windows (x64)
+irm https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows.ps1 | iex
+```
+
+## Development
+
+```sh
+pnpm install
+pnpm dev:desktop   # Tauri dev (React frontend + Rust backend)
+pnpm dev:web       # Next.js marketing/dashboard site
+```
+
+Type checks and linting:
+
+```sh
+pnpm check-types
+pnpm lint
+```
+
+### Repository layout
 
 ```
 ├── apps/
 │   ├── desktop/        # Tauri 2 app (React frontend + Rust backend)
-│   └── web/            # Next.js marketing site (optional — delete if unused)
+│   └── web/            # Next.js marketing site + dashboard
 ├── packages/
 │   ├── ui/             # Shared shadcn-style component kit
+│   ├── domain/         # Shared domain types
 │   ├── eslint-config/
 │   └── typescript-config/
-├── scripts/
-│   ├── sync-brand.mjs  # brand.json → every consumer file
-│   ├── init-app.mjs    # one-time scaffolder after "Use this template"
-│   └── release-tag-sync.mjs
-├── brand.json          # ★ single source of truth for branding + version
+├── scripts/            # sync-brand, Appwrite provisioning, release tooling
 ├── Casks/              # Homebrew cask (auto-updated on release)
 ├── setup/              # curl|sh / irm|iex installers
-└── .github/workflows/  # ci.yml + release.yml (3-platform + cask automation)
+└── brand.json          # ★ single source of truth for branding + version
 ```
 
 ## Branding: edit one file
 
 Change `brand.json`, then run `pnpm sync-brand` (the pre-commit hook does this
-for you). It propagates to `tauri.conf.json`, `Cargo.toml`/`Cargo.lock`, crate
-names in `main.rs`, package.json files, `index.html`, the generated
-`brand.ts`/`brand.rs`, the Homebrew cask, setup scripts, and README badges.
-CI fails (`pnpm sync-brand:check`) if anything drifts.
+for you). It propagates to `tauri.conf.json` (name, identifier, deep-link
+scheme, updater endpoint), `Cargo.toml`/`Cargo.lock`, crate names in
+`main.rs`, package.json files, `index.html`, the generated `brand.ts`/`brand.rs`,
+the Homebrew cask, setup scripts, and README badges. CI fails
+(`pnpm sync-brand:check`) if anything drifts.
 
 ## Releasing
 
@@ -82,12 +93,6 @@ pnpm release:tag patch   # bumps brand.json, syncs, commits, tags, pushes
 The tag push triggers the release workflow: dmg + deb + msi/exe with updater
 artifacts, then updates the Homebrew cask with the new sha256.
 
-<!-- @brand:start downloadLink -->
-
-[Download the latest release &raquo;](https://github.com/tonmoydeb404/tymar/releases/latest)
-
-<!-- @brand:end downloadLink -->
-
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).

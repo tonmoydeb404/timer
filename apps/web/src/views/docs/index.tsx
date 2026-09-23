@@ -18,8 +18,8 @@ export function DocsView() {
         {APP_NAME} documentation
       </h1>
       <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
-        Everything from your first steps to advanced workflows. Docs pages
-        are defined in src/content/docs.ts.
+        From your first tracked session to the mental model behind sessions,
+        projects, and sync.
       </p>
 
       <ul className="mt-10 space-y-4">

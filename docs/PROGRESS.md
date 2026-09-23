@@ -1,4 +1,4 @@
-# Timer — Work Progress
+# Tymar — Work Progress
 
 Last updated: 2026-09-22. Covers everything from the empty scaffold through
 Phase 5 (dashboard analytics/history/editing).
@@ -67,7 +67,7 @@ enforces per-user isolation (no server API key ships in any client).
   Next.js (third-party cookie / SDK localStorage fallback — confirmed from
   SDK source). Marketing pages moved to the `(site)` route group untouched.
 - Desktop auth (final shape after §5): Google OAuth in the **system
-  browser** → Appwrite → web bridge `/auth/desktop` → `timer://auth`
+  browser** → Appwrite → web bridge `/auth/desktop` → `tymar://auth`
   deep link → frontend `account.createSession`. Session + all Appwrite I/O
   live in the webview SDK. Rust holds no credentials.
 
@@ -98,7 +98,7 @@ enforces per-user isolation (no server API key ships in any client).
   splitting is analytics-side).
 - Closed segments queue in `pending` (FIFO, local ids); frontend uploads
   via SDK on every view change and acks by id; `Sync pending (n)` footer.
-- Async lock serializes rapid taps; `timer://changed` events drive UI.
+- Async lock serializes rapid taps; `tymar://changed` events drive UI.
 - Desktop UI: toggle start/stop, Break↔Resume, switch picker (+quick-add
   into the running project), focus task shared Today↔Tasks, ticking
   timestamp-derived display.
@@ -150,12 +150,12 @@ enforces per-user isolation (no server API key ships in any client).
    live in the proven webview SDK.
 4. `register_all()` crashed macOS startup → OS-gated (Windows/Linux
    only; macOS uses the bundled Info.plist).
-5. Appwrite 400 on `timer://` success URL (platform form takes real
+5. Appwrite 400 on `tymar://` success URL (platform form takes real
    hostnames only) → **web bridge** `/auth/desktop` forwards to the
    scheme. No console changes needed.
 6. Better errors: Rust-era auth errors carried method/path/status/server
    type (the `role: guests` message cracked the cookie case).
-7. Dev fallback: the bridge shows a copyable `timer://auth` link and the
+7. Dev fallback: the bridge shows a copyable `tymar://auth` link and the
    desktop login accepts a pasted link (deep link or bridge URL — both
    carry userId+secret), so auth is testable without an installed bundle.
 
@@ -164,10 +164,10 @@ enforces per-user isolation (no server API key ships in any client).
 Verified headless (in CI-repeatable form): `cargo check/clippy/test`,
 `tsc`, `eslint --max-warnings 0`, fresh `vite` + `next` builds; SDK
 source cross-checks (cookie name, OAuth/token paths, CORS reflection of
-`tauri://localhost`); bundled `Info.plist` contains `timer://`.
+`tauri://localhost`); bundled `Info.plist` contains `tymar://`.
 
 Needs a human (in order):
-1. Desktop sign-in end-to-end (bundled app receives `timer://`; dev
+1. Desktop sign-in end-to-end (bundled app receives `tymar://`; dev
    binaries use the paste-the-link fallback on the login screen).
 2. Phase 3 acceptance: start→break→resume→stop, restart mid-session,
    offline stop → pending → flush.

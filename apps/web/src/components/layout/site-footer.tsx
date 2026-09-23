@@ -22,8 +22,8 @@ export function SiteFooter() {
             {APP_NAME}
           </Link>
           <p className="text-sm leading-6 text-muted-foreground">
-            A focused cross-platform desktop app. Replace this blurb in
-            components/layout/site-footer.tsx.
+            Effortless time tracking for focused work. Free and open source
+            on macOS, Windows, and Linux.
           </p>
         </div>
         {footerGroups.map((group) => (

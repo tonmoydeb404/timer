@@ -1,4 +1,4 @@
-import { sitePaths } from "@/config/paths-config";
+import { sitePaths, externalUrls } from "@/config/paths-config";
 import { APP_NAME, SITE_URL, faqItems } from "@/content/homepage";
 import { HomeView } from "@/views/home";
 
@@ -7,11 +7,10 @@ export default function Home() {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     name: APP_NAME,
-    description:
-      "Replace this structured-data description with your app's pitch.",
+    description: externalUrls.descriptionShort,
     url: SITE_URL,
     downloadUrl: sitePaths.download,
-    applicationCategory: "DeveloperApplication",
+    applicationCategory: "ProductivityApplication",
     operatingSystem: "macOS, Windows, Linux",
     offers: {
       "@type": "Offer",

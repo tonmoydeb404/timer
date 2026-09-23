@@ -63,7 +63,7 @@ export default function OpengraphImage() {
               color: "#a1a1aa",
             }}
           >
-            Replace this OG image copy with your app&apos;s tagline.
+            Free, open source, and local-first.
           </div>
         </div>
         <div style={{ display: "flex", gap: 16, fontSize: 24 }}>

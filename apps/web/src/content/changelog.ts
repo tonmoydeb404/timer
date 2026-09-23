@@ -10,13 +10,15 @@ export type ChangelogEntry = {
 export const changelog: ChangelogEntry[] = [
   {
     version: "v0.1.0 — First release",
-    date: "2026-01-01",
+    date: "2026-09-23",
     summary:
-      "Placeholder entry. Describe the release in a sentence or two — what changed and why it matters.",
+      "Tymar's first public release: tray-first time tracking with projects, tasks, breaks, and a synced history.",
     highlights: [
-      "Highlight the headline change of the release.",
-      "List secondary changes users will notice.",
-      "Note any breaking changes or migration steps.",
+      "Start, stop, switch, and take breaks from the system tray with a live elapsed-time readout.",
+      "Projects and tasks with quick search and a command palette (⌘/Ctrl K).",
+      "Local-first storage: session state and settings in SQLite on your device.",
+      "Optional sign-in to sync projects, tasks, and entries with the web dashboard.",
+      "Built-in auto-updates on macOS, Windows, and Linux.",
     ],
   },
 ];

@@ -11,29 +11,32 @@ export type DocPage = {
 
 export const getDoc = (slug: string) => docs.find((d) => d.slug === slug);
 
-// Placeholder docs pages — replace with your app's real documentation.
 export const docs: DocPage[] = [
   {
     slug: "getting-started",
     title: "Getting started",
     h1: "Getting started",
-    metaTitle: "Getting Started — Docs",
+    metaTitle: "Getting Started — Tymar Docs",
     metaDescription:
-      "Install the app, walk through the basics, and finish your first workflow in a few minutes.",
+      "Install Tymar, sign in, and finish your first tracked work session in a few minutes.",
     intro:
-      "A short intro telling the reader what they will accomplish on this page.",
+      "From download to your first tracked session in about five minutes.",
     body: [
       {
-        heading: "1. Install the app",
-        text: "Describe how to download and install on each supported platform, and where the app lives (tray, dock, menu).",
+        heading: "1. Install Tymar",
+        text: "Download a build from GitHub Releases, or run the one-line installer for your platform: curl on macOS and Linux, irm on Windows. On macOS the app installs to /Applications via Homebrew; on Linux the .deb is installed with dpkg; on Windows the installer runs silently. After the first launch, Tymar lives in your system tray.",
       },
       {
-        heading: "2. Do the core thing",
-        text: "Walk through the primary workflow step by step. Keep sentences short and concrete.",
+        heading: "2. Sign in and add your work",
+        text: "Tymar opens with a sign-in screen — use the Google button and approve in your browser; you'll land back in the app automatically. Then create a project (for example \"Client Website\") and a task under it (\"Homepage redesign\"). Projects and tasks sync to your account so the desktop app and web dashboard share the same data.",
       },
       {
-        heading: "3. Go further",
-        text: "Point at the next docs pages or features worth discovering after the first run.",
+        heading: "3. Track your first session",
+        text: "Right-click the tray icon, pick your task, and press Start. The tray readout shows elapsed time while you work. Need a coffee? Choose Take a break — the break is recorded separately and your focus time stays clean. Press Stop when you're done; the session is already in your history.",
+      },
+      {
+        heading: "4. Review and edit",
+        text: "Open the History tab to search past sessions, fix a task, or adjust times by hand. The web dashboard rolls everything up by day, project, and task.",
       },
     ],
     shortcuts: [
@@ -45,23 +48,23 @@ export const docs: DocPage[] = [
     slug: "concepts",
     title: "Concepts",
     h1: "Core concepts",
-    metaTitle: "Concepts — Docs",
+    metaTitle: "Concepts — Tymar Docs",
     metaDescription:
-      "The mental model of the app: the main objects, how they relate, and where your data lives.",
+      "The mental model behind Tymar: sessions, breaks, projects and tasks, and where your data lives.",
     intro:
-      "Explain the two or three concepts a new user needs to form a mental model of the app.",
+      "Three ideas cover everything Tymar does: sessions, projects and tasks, and where your data lives.",
     body: [
       {
-        heading: "Concept A",
-        text: "Describe the first core concept and where the user meets it in the UI.",
+        heading: "Sessions and breaks",
+        text: "A session is one continuous stretch of tracked work. Starting a new session stops the previous one, so you never double-book time. A break is a special kind of session: it pauses your focus time, and both sides of the interruption are recorded so your day stays honest.",
       },
       {
-        heading: "Concept B",
-        text: "Describe the second core concept and how it relates to concept A.",
+        heading: "Projects and tasks",
+        text: "Projects are the containers — a client, a product, a job hunt. Tasks are the concrete things you do inside them. Every session is attributed to a task, which is what makes the dashboard rollups (by project, by task, by day) meaningful. Switching task mid-session switches what the running time is attributed to.",
       },
       {
         heading: "Where data lives",
-        text: "Describe storage, privacy, and (if relevant) how to back things up.",
+        text: "Your settings and the active session snapshot are stored locally on your device in a SQLite database. Your projects, tasks, profile, and finished time entries sync to your account, which is what keeps the desktop app and the web dashboard in step. Sign out on one device and your data is still there when you sign back in.",
       },
     ],
   },

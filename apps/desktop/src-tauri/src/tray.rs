@@ -155,11 +155,11 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
             // The task picker lives in the Today screen: open the window and
             // ask the frontend to show it.
             crate::show_window(app);
-            let _ = app.emit("timer://open-switcher", ());
+            let _ = app.emit("tymar://open-switcher", ());
         }
         "start" => {
             crate::show_window(app);
-            let _ = app.emit("timer://open-switcher", ());
+            let _ = app.emit("tymar://open-switcher", ());
         }
         _ => {}
     }

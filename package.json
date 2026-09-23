@@ -12,7 +12,6 @@
   "keywords": [
     "tauri",
     "desktop-app",
-    "template",
     "tymar"
   ],
   "scripts": {
@@ -26,7 +25,6 @@
     "sync-brand": "node scripts/sync-brand.mjs",
     "sync-brand:check": "node scripts/sync-brand.mjs --check",
     "provision:appwrite": "node scripts/provision-appwrite.mjs",
-    "init-app": "node scripts/init-app.mjs",
     "release:tag": "node scripts/release-tag-sync.mjs",
     "prepare": "git config core.hooksPath .husky || true"
   },

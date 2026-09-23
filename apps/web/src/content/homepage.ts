@@ -12,67 +12,66 @@ export const primaryNav = [
   { label: "Alternatives", href: "/alternatives" },
 ] as const;
 
-// Which screenshot the hero shows. Wire this to your real product shots.
-export const heroScreenshot = "commands" as const;
-
-// ---- Placeholder marketing copy — replace with your product's story ----
+// Which mock view the hero screenshot shows.
+export const heroScreenshot = "timer" as const;
 
 export const capabilities = [
   {
-    title: "Capability one",
-    description: "One sentence describing a core capability of your app.",
-    icon: "mouse",
+    title: "Start with one click",
+    description:
+      "Begin a work session straight from the system tray — no forms, no start screen, no tab to keep open.",
+    icon: "timer",
   },
   {
-    title: "Capability two",
-    description: "One sentence describing a core capability of your app.",
-    icon: "laptop",
+    title: "Projects and tasks",
+    description:
+      "Group every entry under a project and task, so each hour lands in the right bucket automatically.",
+    icon: "folder",
   },
   {
-    title: "Capability three",
-    description: "One sentence describing a core capability of your app.",
-    icon: "calendar",
+    title: "Breaks that count correctly",
+    description:
+      "Step away without guessing. Breaks are tracked separately from focus time and folded back into your day.",
+    icon: "coffee",
   },
   {
-    title: "Capability four",
-    description: "One sentence describing a core capability of your app.",
-    icon: "history",
+    title: "Local-first, synced when you want",
+    description:
+      "Session state and settings live on your device. Sign in to sync projects, tasks, and history.",
+    icon: "shield",
   },
 ] as const;
 
 export const features = [
   {
-    id: "feature-one",
-    title: "Feature one headline",
+    id: "one-click-tracking",
+    title: "Tracking that starts before you think about it",
     description:
-      "A short paragraph explaining the feature and why it matters to the person evaluating your app. Keep it concrete and benefit-driven.",
-    visualTitle: "Feature one visual",
-    visualDescription:
-      "Reserved for a product screenshot of feature one.",
-    visualView: "commands",
+      "Tymar lives in your system tray. Pick a task, click start, and get on with your work — the timer keeps running even when the window is closed, and the tray readout shows elapsed time at a glance.",
+    visualTitle: "Live session view",
+    visualDescription: "Screenshot of the live session view with elapsed time and break controls.",
+    visualView: "timer",
     tone: "rose",
     span: "wide",
   },
   {
-    id: "feature-two",
-    title: "Feature two headline",
+    id: "projects-and-tasks",
+    title: "Every hour in the right bucket",
     description:
-      "A short paragraph explaining the second feature. Mention what the user no longer has to do by hand.",
-    visualTitle: "Feature two visual",
-    visualDescription:
-      "Reserved for a product screenshot of feature two.",
-    visualView: "commands",
+      "Organize work into projects and tasks, then switch context in one click without losing the running session.",
+    visualTitle: "Projects and tasks",
+    visualDescription: "Screenshot of the project and task pickers.",
+    visualView: "projects",
     tone: "violet",
     span: "narrow",
   },
   {
-    id: "feature-three",
-    title: "Feature three headline",
+    id: "history-that-adds-up",
+    title: "Your day, accounted for",
     description:
-      "A closing feature paragraph that ties the workflow together and leads toward the download call to action.",
-    visualTitle: "Feature three visual",
-    visualDescription:
-      "Reserved for a final product composition.",
+      "Every session — work and breaks — lands in a searchable history with edit support and a dashboard that rolls your time up by day, project, and task. No more reconstructing the week from memory at 6pm on Friday.",
+    visualTitle: "History and dashboard",
+    visualDescription: "Screenshot of the history list and time dashboard.",
     visualView: "history",
     tone: "blue",
     span: "full",
@@ -81,39 +80,42 @@ export const features = [
 
 export const workflow = [
   {
-    title: "Step one",
-    description: "Describe the first step of the happy path.",
+    title: "Pick a task",
+    description:
+      "Choose the project and task you're working on from the tray menu or the command palette.",
   },
   {
-    title: "Step two",
-    description: "Describe what happens in the middle.",
+    title: "Work — breaks included",
+    description:
+      "Start the timer and focus. Take a break whenever you need one; Tymar keeps the two apart.",
   },
   {
-    title: "Step three",
-    description: "Describe the outcome the user gets.",
+    title: "See where the day went",
+    description:
+      "Stop the session and it's already in your history, rolled up by project, task, and day.",
   },
 ] as const;
 
 export const faqItems = [
   {
-    question: "What is this app?",
+    question: "What is Tymar?",
     answer:
-      "A placeholder answer describing what your app does and who it is for.",
+      "Tymar is a minimal time tracking app for people who do focused work. It lives in your system tray, tracks work and break sessions, and keeps a searchable history — without dashboards you have to babysit.",
   },
   {
     question: "Which platforms are supported?",
     answer:
-      "Describe the platforms your app ships on and where downloads live.",
+      "macOS (Apple Silicon), Windows (x64), and Linux (deb, x86_64). Install with the one-line script on the download page or grab a binary from GitHub Releases.",
   },
   {
-    question: "Is it free?",
+    question: "Is Tymar free?",
     answer:
-      "Describe your licensing and pricing model (the template ships as MIT).",
+      "Yes. Tymar is free and open source under the MIT License — no subscriptions, no feature locks, no ads.",
   },
   {
     question: "Where does my data live?",
     answer:
-      "Describe your data story — the template's desktop app is local-first with SQLite storage.",
+      "Session state and settings stay on your device in a local SQLite database. When you sign in, your projects, tasks, and time entries sync to your account so the desktop app and web dashboard stay in step. The full source is on GitHub, so you can verify all of it.",
   },
 ] as const;
 

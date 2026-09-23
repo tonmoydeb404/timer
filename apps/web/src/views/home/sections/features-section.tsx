@@ -11,8 +11,8 @@ export function FeaturesSection() {
     >
       <SectionHeading
         id="features-title"
-        title="Everything a saved command needs"
-        description="From the tray click to the run history, each feature keeps repeatable shell work organized and out of the terminal."
+        title="Everything a tracked day needs"
+        description="From the tray click to the end-of-day history, each feature keeps your time accounted for without asking for attention."
       />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {features.map((feature) => (

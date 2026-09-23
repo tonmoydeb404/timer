@@ -6,8 +6,7 @@ import { APP_NAME } from "@/content/homepage";
 
 export const metadata: Metadata = {
   title: `Privacy — ${APP_NAME}`,
-  description:
-    `A placeholder privacy summary for ${APP_NAME}. Replace it to match what your app actually does.`,
+  description: `${APP_NAME} is local-first: settings and session state stay on your device, and only your projects, tasks, and time entries sync to your account.`,
   alternates: { canonical: sitePaths.privacy },
 };
 

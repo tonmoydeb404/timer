@@ -44,7 +44,7 @@ const channels: Channel[] = [
     icon: LifeBuoy,
     title: "Read the docs",
     description:
-      "Installation, saving commands, scheduling, history, and troubleshooting — covered step by step.",
+      "Installation, your first session, projects and tasks, breaks, and sync — covered step by step.",
     href: sitePaths.docs.root,
     cta: "Open docs",
     external: false,
@@ -53,7 +53,7 @@ const channels: Channel[] = [
     icon: ShieldCheck,
     title: "Privacy & security",
     description:
-      "The app is local-first — adjust this card copy to your support reality.",
+      "Tymar is local-first: settings and session state stay on your device, and only your tracked data syncs.",
     href: sitePaths.privacy,
     cta: "Read the privacy notes",
     external: false,
