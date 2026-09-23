@@ -1,13 +1,13 @@
-import { Button } from "@packages/ui/components/button";
-import { Switch } from "@packages/ui/components/switch";
-import { ExternalLink, LogIn, LogOut, Moon, Rocket } from "lucide-react";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { useApp } from "@/context/app-context";
 import { api } from "@/lib/api";
 import { brand } from "@/lib/brand";
+import { Button } from "@packages/ui/components/button";
+import { Switch } from "@packages/ui/components/switch";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { ExternalLink, LogIn, LogOut, Moon, Rocket } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 function Section({
   title,
@@ -38,7 +38,7 @@ function Row({
   control: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
       <div className="flex min-w-0 items-center gap-2.5">
         {icon && (
           <span className="grid size-7 shrink-0 place-items-center rounded-md bg-control text-muted-foreground">
@@ -128,7 +128,7 @@ export function SettingsScreen() {
       </Section>
 
       <Section title="Account">
-        <div className="grid gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
+        <div className="grid gap-2 rounded-xl border border-border bg-card p-3">
           {auth?.status === "active" && auth.user ? (
             <>
               <span className="truncate text-xs font-semibold text-ink">
@@ -175,7 +175,7 @@ export function SettingsScreen() {
       </Section>
 
       <Section title="About">
-        <div className="grid gap-1 rounded-xl border border-border bg-card p-3 text-[11px] text-muted-foreground shadow-sm">
+        <div className="grid gap-1 rounded-xl border border-border bg-card p-3 text-[11px] text-muted-foreground">
           <span className="text-xs font-semibold text-ink">
             {brand.appName} <span className="text-faint">v{brand.version}</span>
           </span>

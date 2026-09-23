@@ -1,11 +1,9 @@
 import { ManualEntrySheet } from "@/components/manual-entry-sheet";
 import { StartSessionSheet } from "@/components/start-session-sheet";
 import { useApp } from "@/context/app-context";
+import { useProjects, useTasks, useTimeEntries } from "@/context/db/db-context";
 import { useTimer } from "@/context/timer-context";
-import { useTasks } from "@/hooks/use-tasks";
-import { useTimeEntries } from "@/hooks/use-time-entries";
 import { onOpenSwitcher } from "@/lib/api";
-import { createManualTimeEntry } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import {
   aggregateDayTotals,
@@ -33,8 +31,9 @@ import { toast } from "sonner";
 // can be quick-added here once a project is picked.
 export function HomeScreen() {
   const { auth } = useApp();
-  const { projects, tasks, quickAdd } = useTasks();
-  const { entries, timeZone, refresh: refreshEntries } = useTimeEntries(500);
+  const { projects } = useProjects();
+  const { tasks, quickAdd } = useTasks();
+  const { entries, timeZone, addManualEntry } = useTimeEntries();
   const { view, busy, fetchedAt, start, takeBreak, resume, stop, switchTo } =
     useTimer();
   const [, setTick] = useState(0);
@@ -321,14 +320,13 @@ export function HomeScreen() {
             return;
           }
           try {
-            await createManualTimeEntry(userId, {
+            await addManualEntry({
               taskId,
               projectId,
               type,
               startedAt,
               endedAt,
             });
-            await refreshEntries();
             toast.success("Manual entry added.");
           } catch (err) {
             toast.error("Failed to add entry", {

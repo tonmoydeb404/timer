@@ -2,6 +2,7 @@ import { Skeleton } from "@packages/ui/components/skeleton";
 import { Toaster } from "@packages/ui/components/sonner";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppProvider, useApp } from "./context/app-context";
+import { DbProvider } from "./context/db/db-context";
 import { ModalProvider } from "./context/modal-context";
 import { TimerProvider } from "./context/timer-context";
 import { TabLayout } from "./layouts/tab-layout";
@@ -63,14 +64,16 @@ function AppRoutes() {
 export default function App() {
   return (
     <AppProvider>
-      <TimerProvider>
-        <ModalProvider>
-          <HashRouter>
-            <AppRoutes />
-          </HashRouter>
-          <Toaster position="bottom-right" />
-        </ModalProvider>
-      </TimerProvider>
+      <DbProvider>
+        <TimerProvider>
+          <ModalProvider>
+            <HashRouter>
+              <AppRoutes />
+            </HashRouter>
+            <Toaster position="bottom-right" />
+          </ModalProvider>
+        </TimerProvider>
+      </DbProvider>
     </AppProvider>
   );
 }

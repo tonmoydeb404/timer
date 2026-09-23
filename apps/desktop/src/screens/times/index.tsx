@@ -1,8 +1,6 @@
 import { ManualEntrySheet } from "@/components/manual-entry-sheet";
 import { useApp } from "@/context/app-context";
-import { useTasks } from "@/hooks/use-tasks";
-import { useTimeEntries } from "@/hooks/use-time-entries";
-import { createManualTimeEntry } from "@/lib/db";
+import { useProjects, useTasks, useTimeEntries } from "@/context/db/db-context";
 import {
   currentWeekBounds,
   entryDurationMs,
@@ -10,20 +8,55 @@ import {
   formatDurationShort,
   groupEntriesByStartDay,
 } from "@packages/domain/index";
-import { Badge } from "@packages/ui/components/badge";
 import { Button } from "@packages/ui/components/button";
 import { DataState } from "@packages/ui/components/data-state";
+import { EntryTypeBadge } from "@packages/ui/components/entry-type-badge";
+import { Skeleton } from "@packages/ui/components/skeleton";
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+
+// Mimics the shape of a day group + its entry rows so the loading state
+// doesn't jump around once the real content lands.
+function TimesLoadingSkeleton() {
+  return (
+    <div className="grid gap-4">
+      {[0, 1].map((day) => (
+        <section key={day} className="grid gap-1.5">
+          <div className="flex items-baseline justify-between px-1">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-2.5 w-20" />
+          </div>
+          <ul className="grid gap-1.5">
+            {[0, 1, 2].map((row) => (
+              <li
+                key={row}
+                className="flex items-center gap-2 rounded-xl border border-border bg-card p-2.5"
+              >
+                <Skeleton className="aspect-square h-5 shrink-0 rounded-full" />
+                <div className="grid min-w-0 flex-1 gap-1">
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-2.5 w-40" />
+                </div>
+                <Skeleton className="h-3 w-10 shrink-0" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}
 
 // Times tab: this week's sessions only (Mon–Sun), grouped by day. Editing
 // existing entries lives on the web dashboard; this app can only add new
 // manual entries.
 export function TimesScreen() {
   const { auth } = useApp();
-  const { projects, tasks, quickAdd } = useTasks();
-  const { entries, timeZone, loading, error, refresh } = useTimeEntries(500);
+  const { projects } = useProjects();
+  const { tasks, quickAdd } = useTasks();
+  const { entries, timeZone, loading, error, reload, addManualEntry } =
+    useTimeEntries();
   const [manualOpen, setManualOpen] = useState(false);
 
   const userId = auth?.user?.id ?? null;
@@ -88,9 +121,10 @@ export function TimesScreen() {
         loading={loading}
         error={error}
         data={groups}
-        onRetry={() => void refresh()}
+        onRetry={() => void reload()}
         emptyTitle="No sessions this week"
         emptyHint="Start a timer or add a manual entry to see it here."
+        loadingComponent={<TimesLoadingSkeleton />}
       >
         {(days) => (
           <div className="grid gap-4">
@@ -127,18 +161,15 @@ export function TimesScreen() {
                       return (
                         <li
                           key={entry.$id}
-                          className="flex items-center gap-2 rounded-xl border border-border bg-card p-2.5 shadow-sm"
+                          className="flex items-center gap-2 rounded-xl border border-border bg-card p-2.5"
                         >
-                          <Badge
-                            variant={
-                              entry.type === "BREAK" ? "secondary" : "outline"
-                            }
-                            className="shrink-0 font-mono text-[9px]"
-                          >
-                            {entry.type === "BREAK" ? "BREAK" : "WORK"}
-                          </Badge>
+                          <EntryTypeBadge
+                            type={entry.type}
+                            iconOnly
+                            className="size-9 shrink-0 [&>svg]:size-[18px]!"
+                          />
                           <div className="grid min-w-0 flex-1">
-                            <span className="truncate text-xs font-semibold text-ink">
+                            <span className="truncate text-xs font-medium text-ink">
                               {task?.title ?? "No task"}
                             </span>
                             <span className="truncate font-mono text-[10px] text-muted-foreground tabular-nums">
@@ -183,14 +214,13 @@ export function TimesScreen() {
             return;
           }
           try {
-            await createManualTimeEntry(userId, {
+            await addManualEntry({
               taskId,
               projectId,
               type,
               startedAt,
               endedAt,
             });
-            await refresh();
             toast.success("Manual entry added.");
           } catch (err) {
             toast.error("Failed to add entry", {
