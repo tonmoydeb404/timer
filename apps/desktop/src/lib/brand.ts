@@ -7,7 +7,7 @@ export const brand = {
   "appName": "Tymar",
   "slug": "tymar",
   "identifier": "com.tonmoydeb.tymar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "developer": {
     "name": "Tonmoy Deb",
     "website": "https://tonmoydeb.com"
