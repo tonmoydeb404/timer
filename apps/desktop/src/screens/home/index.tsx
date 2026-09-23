@@ -212,7 +212,7 @@ export function HomeScreen() {
             <Button
               onClick={() => void resume()}
               disabled={busy}
-              className="bg-emerald-600 text-white hover:bg-emerald-600/90"
+              variant="default"
             >
               <Play size={16} />
               Resume
@@ -221,7 +221,7 @@ export function HomeScreen() {
             <Button
               onClick={() => void takeBreak()}
               disabled={busy || !running}
-              className="bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-400"
+              variant="secondary"
             >
               <Coffee size={16} />
               Break
@@ -230,7 +230,7 @@ export function HomeScreen() {
           <Button
             onClick={() => setStartOpen(true)}
             disabled={busy || !running}
-            variant="default"
+            variant="outline"
           >
             <ArrowLeftRight size={16} />
             Switch

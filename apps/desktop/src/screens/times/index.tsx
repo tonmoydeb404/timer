@@ -1,4 +1,5 @@
 import { ManualEntrySheet } from "@/components/manual-entry-sheet";
+import { ScreenHeader } from "@/components/screen-header";
 import { useApp } from "@/context/app-context";
 import { useProjects, useTasks, useTimeEntries } from "@/context/db/db-context";
 import {
@@ -102,20 +103,20 @@ export function TimesScreen() {
 
   return (
     <section className="mx-auto grid h-full w-full max-w-[420px] content-start gap-3 overflow-y-auto scrollbar-thin px-3.5 pt-4 pb-24">
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-          This week
-        </h1>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setManualOpen(true)}
-          className="h-7 gap-1 px-2 text-[11px]"
-        >
-          <Plus size={13} />
-          Add manual
-        </Button>
-      </div>
+      <ScreenHeader
+        title="This week"
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setManualOpen(true)}
+            className="h-7 gap-1 px-2 text-[11px]"
+          >
+            <Plus size={13} />
+            Add manual
+          </Button>
+        }
+      />
 
       <DataState
         loading={loading}

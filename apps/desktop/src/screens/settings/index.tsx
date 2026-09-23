@@ -1,3 +1,4 @@
+import { ScreenHeader } from "@/components/screen-header";
 import { useApp } from "@/context/app-context";
 import { api } from "@/lib/api";
 import { brand } from "@/lib/brand";
@@ -92,10 +93,8 @@ export function SettingsScreen() {
   }
 
   return (
-    <section className="mx-auto grid h-full w-full max-w-[420px] content-start gap-4 overflow-y-auto scrollbar-thin px-3.5 pt-2 pb-4">
-      <h1 className="font-mono text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-        Settings
-      </h1>
+    <section className="mx-auto grid h-full w-full max-w-[420px] content-start gap-4 overflow-y-auto scrollbar-thin px-3.5 pt-4 pb-4">
+      <ScreenHeader title="Settings" />
 
       <Section title="Appearance">
         <Row
