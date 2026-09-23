@@ -2,7 +2,6 @@ import { useApp } from "@/context/app-context";
 import { brand } from "@/lib/brand";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
-import { Timer } from "lucide-react";
 import { useState } from "react";
 
 function GoogleIcon() {
@@ -59,9 +58,11 @@ export function LoginScreen() {
   return (
     <main className="flex h-svh w-screen flex-col items-center justify-center gap-6 overflow-hidden px-6">
       <div className="grid justify-items-center gap-2 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-          <Timer size={24} />
-        </span>
+        <img
+          src="/logo.svg"
+          alt={`${brand.appName} logo`}
+          className="size-18"
+        />
         <h1 className="text-xl font-[760] text-ink">
           Welcome to {brand.appName}
         </h1>

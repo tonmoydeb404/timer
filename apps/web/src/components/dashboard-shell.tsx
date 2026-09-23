@@ -1,15 +1,16 @@
 "use client";
 
-import { Button } from "@packages/ui/components/button";
-import { Separator } from "@packages/ui/components/separator";
-import { LogOut, Timer } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { appPaths } from "@/config/paths-config";
 import { APP_NAME } from "@/content/homepage";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { Button } from "@packages/ui/components/button";
+import { Separator } from "@packages/ui/components/separator";
+import { LogOut } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const navItems = [
   { label: "Overview", href: appPaths.dashboard },
@@ -29,9 +30,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="container flex h-14 items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <Link href={appPaths.dashboard} className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Timer size={15} />
-              </span>
+              <Image
+                src="/logo.svg"
+                alt={`${APP_NAME} logo`}
+                width={26}
+                height={26}
+              />
               <span className="font-medium">{APP_NAME}</span>
             </Link>
             <nav

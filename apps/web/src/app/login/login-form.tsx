@@ -1,5 +1,9 @@
 "use client";
 
+import { appPaths, sitePaths } from "@/config/paths-config";
+import { APP_NAME } from "@/content/homepage";
+import { isAppwriteConfigured } from "@/lib/appwrite";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@packages/ui/components/button";
 import {
   Card,
@@ -8,14 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@packages/ui/components/card";
-import { Timer } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { appPaths, sitePaths } from "@/config/paths-config";
-import { APP_NAME } from "@/content/homepage";
-import { useAuth } from "@/lib/auth-context";
-import { isAppwriteConfigured } from "@/lib/appwrite";
 
 export function LoginForm() {
   const router = useRouter();
@@ -60,7 +60,12 @@ export function LoginForm() {
     <Card className="w-full max-w-sm">
       <CardHeader className="items-center text-center">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Timer size={22} />
+          <Image
+            src="/logo.svg"
+            alt={`${APP_NAME} logo`}
+            width={28}
+            height={28}
+          />
         </span>
         <CardTitle>Welcome to {APP_NAME}</CardTitle>
         <CardDescription>
@@ -74,8 +79,8 @@ export function LoginForm() {
           </Button>
         ) : (
           <p className="rounded-lg bg-muted p-3 text-center text-sm text-muted-foreground">
-            Appwrite is not configured. Set{" "}
-            <code>NEXT_PUBLIC_APPWRITE_*</code> and restart.
+            Appwrite is not configured. Set <code>NEXT_PUBLIC_APPWRITE_*</code>{" "}
+            and restart.
           </p>
         )}
         {message && (
