@@ -1,5 +1,5 @@
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="64" height="64" rx="14" fill="#7c6cf6" />
-  <path d="M20 44V20M20 32l14-12M20 32l14 12" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
-  <circle cx="45" cy="23" r="3.5" fill="#ffffff" opacity="0.9" />
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M261.801 118.894L193.919 51.0122C171.268 28.3618 134.545 28.3618 111.894 51.0122L44.0122 118.894C21.3618 141.545 21.3618 178.268 44.0122 200.919L111.894 268.801C134.545 291.451 171.268 291.451 193.919 268.801L261.801 200.919C284.451 178.268 284.451 141.545 261.801 118.894Z" fill="#E2CA2B"/>
+<path d="M350.872 182.652L280.161 111.941C255.168 86.9476 214.645 86.9476 189.652 111.941L118.941 182.652C93.9476 207.645 93.9476 248.168 118.941 273.161L189.652 343.872C214.645 368.866 255.168 368.866 280.161 343.872L350.872 273.161C375.866 248.168 375.866 207.645 350.872 182.652Z" fill="#00A86B"/>
+<path d="M182.907 231.907L222.907 275.907L302.907 185.907" stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

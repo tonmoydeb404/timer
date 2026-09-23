@@ -14,7 +14,7 @@
 export const externalUrls = {
   site: "https://tonmoydeb.com",
   appName: "Tymar",
-  descriptionShort: "A cross-platform desktop app built with Tauri.",
+  descriptionShort: "Effortless time tracking for focused work.",
   download: "https://github.com/tonmoydeb404/tymar/releases/latest",
   repository: "https://github.com/tonmoydeb404/tymar",
   license: "https://github.com/tonmoydeb404/tymar/blob/main/LICENSE",

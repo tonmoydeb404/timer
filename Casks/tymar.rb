@@ -6,7 +6,7 @@ cask "tymar" do
 
   url "https://github.com/tonmoydeb404/tymar/releases/download/v#{version}/Tymar_#{version}_#{arch}.dmg"
   name "Tymar"
-  desc "A cross-platform desktop app built with Tauri."
+  desc "Effortless time tracking for focused work."
   homepage "https://github.com/tonmoydeb404/tymar"
 
   depends_on macos: :big_sur

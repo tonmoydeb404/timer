@@ -1,7 +1,7 @@
 [package]
 name = "tymar"
 version = "0.1.0"
-description = "A cross-platform desktop app built with Tauri."
+description = "Effortless time tracking for focused work."
 authors = ["Tonmoy Deb"]
 homepage = "https://tonmoydeb.com"
 repository = "https://github.com/tonmoydeb404/tymar"

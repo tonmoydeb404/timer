@@ -18,7 +18,19 @@
  *   pnpm sync-brand          rewrite all consumers from brand.json
  *   pnpm sync-brand --check  exit 1 if any consumer is out of sync (CI guard)
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -171,6 +183,118 @@ const setLine = (text, prefix, replacement) => {
   return text.replace(re, replacement);
 };
 
+const collectFiles = (directory, prefix = "") => {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const relative = path.join(prefix, entry.name);
+    if (entry.isDirectory())
+      return collectFiles(path.join(directory, entry.name), relative);
+    return [relative.split(path.sep).join("/")];
+  });
+};
+
+const filesMatch = (left, right) =>
+  existsSync(left) &&
+  existsSync(right) &&
+  statSync(left).isFile() &&
+  statSync(right).isFile() &&
+  readFileSync(left).equals(readFileSync(right));
+
+const syncAssets = () => {
+  const source = path.join(REPO_ROOT, "public/logo.svg");
+  if (!existsSync(source)) {
+    throw new Error(
+      "sync-brand: missing public/logo.svg; add the canonical SVG logo first",
+    );
+  }
+
+  const assetConsumers = [
+    "apps/desktop/public/logo.svg",
+    "apps/web/public/logo.svg",
+    "apps/web/src/app/icon.svg",
+  ];
+  const iconOutput = path.join(REPO_ROOT, "apps/desktop/src-tauri/icons");
+  const temporaryIcons = mkdtempSync(path.join(tmpdir(), "tymar-icons-"));
+  const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+
+  try {
+    execFileSync(
+      pnpm,
+      [
+        "--filter",
+        "@apps/desktop",
+        "exec",
+        "tauri",
+        "icon",
+        source,
+        "--output",
+        temporaryIcons,
+      ],
+      { cwd: REPO_ROOT, stdio: CHECK ? "ignore" : "inherit" },
+    );
+
+    const generatedIconFiles = collectFiles(temporaryIcons);
+    const assetDrift = assetConsumers.filter(
+      (consumer) => !filesMatch(source, path.join(REPO_ROOT, consumer)),
+    );
+    const currentIconFiles = collectFiles(iconOutput);
+    const deterministicIconFiles = generatedIconFiles.filter(
+      (relative) => relative !== "icon.icns",
+    );
+    const iconDrift = deterministicIconFiles.some(
+      (relative) =>
+        !filesMatch(
+          path.join(temporaryIcons, relative),
+          path.join(iconOutput, relative),
+        ),
+    );
+    const staleIconFiles = currentIconFiles.some(
+      (relative) => !generatedIconFiles.includes(relative),
+    );
+    const missingIcns = !existsSync(path.join(iconOutput, "icon.icns"));
+
+    if (CHECK) {
+      if (assetDrift.length || iconDrift || staleIconFiles || missingIcns) {
+        console.error(
+          "brand: icon assets out of sync — run `pnpm sync-brand`:",
+        );
+        for (const file of assetDrift) console.error(`  ${file}`);
+        if (iconDrift || staleIconFiles || missingIcns) {
+          console.error("  apps/desktop/src-tauri/icons/**");
+        }
+        throw new Error("brand: icon assets are out of sync");
+      }
+      return;
+    }
+
+    for (const consumer of assetConsumers) {
+      const destination = path.join(REPO_ROOT, consumer);
+      mkdirSync(path.dirname(destination), { recursive: true });
+      copyFileSync(source, destination);
+    }
+
+    const preserveIcns = !iconDrift && !missingIcns;
+    const existingIcns = preserveIcns
+      ? readFileSync(path.join(iconOutput, "icon.icns"))
+      : undefined;
+    rmSync(iconOutput, { recursive: true, force: true });
+    mkdirSync(iconOutput, { recursive: true });
+    for (const relative of generatedIconFiles) {
+      const destination = path.join(iconOutput, relative);
+      mkdirSync(path.dirname(destination), { recursive: true });
+      if (relative === "icon.icns" && existingIcns) {
+        writeFileSync(destination, existingIcns);
+      } else {
+        copyFileSync(path.join(temporaryIcons, relative), destination);
+      }
+    }
+  } finally {
+    rmSync(temporaryIcons, { recursive: true, force: true });
+  }
+};
+
+syncAssets();
+
 // ---------------------------------------------------------------------------
 // generated file bodies
 // ---------------------------------------------------------------------------
@@ -295,10 +419,7 @@ cargoLock = setCargoLockPackageVersion(cargoLock, crateName, brand.version);
 
 // main.rs: the lib crate reference follows the `<slug>_lib::run()` convention.
 let mainRs = read("apps/desktop/src-tauri/src/main.rs");
-mainRs = mainRs.replace(
-  /^(\s*)[a-z0-9_]+::run\(\)$/m,
-  `$1${libName}::run()`,
-);
+mainRs = mainRs.replace(/^(\s*)[a-z0-9_]+::run\(\)$/m, `$1${libName}::run()`);
 
 // index.html: window title + pre-hydration theme storage key (must match the
 // storageKey in src/components/theme-provider.tsx, which reads brand.slug).
@@ -371,7 +492,11 @@ setupSh = setLine(setupSh, `PACKAGE=`, `PACKAGE="${brand.slug}"`);
 setupSh = setLine(setupSh, `TAP=`, `TAP="${brand.homebrewTap}"`);
 setupSh = setLine(setupSh, `TAP_URL=`, `TAP_URL="${repoGit}"`);
 setupSh = setLine(setupSh, `REPO=`, `REPO="${repoSlug}"`);
-setupSh = setLine(setupSh, `DEFAULT_VERSION=`, `DEFAULT_VERSION="v${brand.version}"`);
+setupSh = setLine(
+  setupSh,
+  `DEFAULT_VERSION=`,
+  `DEFAULT_VERSION="v${brand.version}"`,
+);
 setupSh = rebrandNames(setupSh);
 
 const ps1UsageBlock = `#   irm ${brand.scripts.setupPs1} | iex
@@ -380,7 +505,11 @@ let setupPs1 = read("setup/windows.ps1");
 setupPs1 = applyShellBlock(setupPs1, "usage", ps1UsageBlock);
 setupPs1 = setLine(setupPs1, `$Repo = `, `$Repo = "${repoSlug}"`);
 setupPs1 = setLine(setupPs1, `$AppName = `, `$AppName = "${brand.appName}"`);
-setupPs1 = setLine(setupPs1, `$DefaultVersion = `, `$DefaultVersion = "v${brand.version}"`);
+setupPs1 = setLine(
+  setupPs1,
+  `$DefaultVersion = `,
+  `$DefaultVersion = "v${brand.version}"`,
+);
 setupPs1 = rebrandNames(setupPs1);
 
 const uninstallShUsageBlock = `#   curl -fsSL ${brand.scripts.uninstallSh} | sh
@@ -389,7 +518,11 @@ let uninstallSh = read("setup/unix-uninstall.sh");
 uninstallSh = applyShellBlock(uninstallSh, "usage", uninstallShUsageBlock);
 uninstallSh = setLine(uninstallSh, `TAP=`, `TAP="${brand.homebrewTap}"`);
 uninstallSh = setLine(uninstallSh, `REPO=`, `REPO="${repoSlug}"`);
-uninstallSh = setLine(uninstallSh, `IDENTIFIER=`, `IDENTIFIER="${brand.identifier}"`);
+uninstallSh = setLine(
+  uninstallSh,
+  `IDENTIFIER=`,
+  `IDENTIFIER="${brand.identifier}"`,
+);
 uninstallSh = setLine(uninstallSh, `APP_NAME=`, `APP_NAME="${brand.appName}"`);
 uninstallSh = setLine(uninstallSh, `PACKAGE=`, `PACKAGE="${brand.slug}"`);
 uninstallSh = rebrandNames(uninstallSh);
@@ -399,8 +532,16 @@ const uninstallPs1UsageBlock = `#   irm ${brand.scripts.uninstallPs1} | iex
 let uninstallPs1 = read("setup/windows-uninstall.ps1");
 uninstallPs1 = applyShellBlock(uninstallPs1, "usage", uninstallPs1UsageBlock);
 uninstallPs1 = setLine(uninstallPs1, `$Repo = `, `$Repo = "${repoSlug}"`);
-uninstallPs1 = setLine(uninstallPs1, `$Identifier = `, `$Identifier = "${brand.identifier}"`);
-uninstallPs1 = setLine(uninstallPs1, `$AppName = `, `$AppName = "${brand.appName}"`);
+uninstallPs1 = setLine(
+  uninstallPs1,
+  `$Identifier = `,
+  `$Identifier = "${brand.identifier}"`,
+);
+uninstallPs1 = setLine(
+  uninstallPs1,
+  `$AppName = `,
+  `$AppName = "${brand.appName}"`,
+);
 uninstallPs1 = rebrandNames(uninstallPs1);
 
 const externalUrlsBlock = `export const externalUrls = {

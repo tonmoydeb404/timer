@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Tymar desktop app — A cross-platform desktop app built with Tauri. Built with Tauri 2.",
+  "description": "Tymar desktop app — Effortless time tracking for focused work. Built with Tauri 2.",
   "license": "MIT",
   "homepage": "https://tonmoydeb.com",
   "repository": {

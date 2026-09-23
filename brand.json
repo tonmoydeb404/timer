@@ -18,8 +18,8 @@
     "uninstallPs1": "https://raw.githubusercontent.com/tonmoydeb404/tymar/main/setup/windows-uninstall.ps1"
   },
   "description": {
-    "short": "A cross-platform desktop app built with Tauri.",
-    "long": "Tymar is a cross-platform desktop app built with Tauri 2, React, and Rust."
+    "short": "Effortless time tracking for focused work.",
+    "long": "Tymar is a minimal, powerful time tracking app for macOS, Windows, and Linux. Focus on your work while Tymar handles the rest."
   },
   "copyright": "Copyright (c) 2026 Tonmoy Deb",
   "homebrewTap": "tonmoydeb404/tymar"

@@ -24,13 +24,23 @@ Everything you need to go from "Use this template" to a shipping app.
 
 ## 2. Icons
 
+Place the source SVG at `public/logo.svg`, then run:
+
+```sh
+pnpm sync-brand
+```
+
+This copies the logo to the desktop and web favicon locations and regenerates
+the complete native Tauri icon set under `apps/desktop/src-tauri/icons/`.
+The sync check also verifies that the generated assets are committed.
+
+For a one-off manual generation, use:
+
 ```sh
 pnpm --filter @apps/desktop tauri icon path/to/your-icon.png
 ```
 
-Generates every size under `apps/desktop/src-tauri/icons/`. Also replace
-`apps/desktop/public/logo.svg` (used in the sidebar header) and
-`apps/web/src/app/icon.svg` (website favicon).
+The source can be a squared PNG or SVG with transparency.
 
 ## 3. Updater keys (required before your first release)
 
@@ -67,15 +77,15 @@ Rust-side checks (run inside `apps/desktop/src-tauri/`): `cargo check`,
 
 ### Architecture map
 
-| Thing | Where |
-| --- | --- |
-| IPC commands (Rust) | `apps/desktop/src-tauri/src/commands.rs` |
-| IPC wrappers (TS) | `apps/desktop/src/lib/api.ts` |
-| SQLite + migrations | `src-tauri/src/db.rs`, `src-tauri/src/migrations/sql/` |
-| Global state (React) | `apps/desktop/src/context/app-context.tsx` |
-| Screens + routes | `apps/desktop/src/screens/`, `src/app.tsx` |
-| Shared UI kit | `packages/ui` (shadcn-style, add via `shadcn` CLI) |
-| Brand constants | `src/lib/brand.ts`, `src-tauri/src/brand.rs` (generated) |
+| Thing                | Where                                                    |
+| -------------------- | -------------------------------------------------------- |
+| IPC commands (Rust)  | `apps/desktop/src-tauri/src/commands.rs`                 |
+| IPC wrappers (TS)    | `apps/desktop/src/lib/api.ts`                            |
+| SQLite + migrations  | `src-tauri/src/db.rs`, `src-tauri/src/migrations/sql/`   |
+| Global state (React) | `apps/desktop/src/context/app-context.tsx`               |
+| Screens + routes     | `apps/desktop/src/screens/`, `src/app.tsx`               |
+| Shared UI kit        | `packages/ui` (shadcn-style, add via `shadcn` CLI)       |
+| Brand constants      | `src/lib/brand.ts`, `src-tauri/src/brand.rs` (generated) |
 
 Dev builds use a separate identifier (`<identifier>.dev`) and a `dev/`
 subdirectory for app data, so they never touch the installed app's data.

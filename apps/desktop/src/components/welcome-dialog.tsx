@@ -1,13 +1,6 @@
 import { brand } from "@/lib/brand";
 import { Button } from "@packages/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@packages/ui/components/dialog";
-import { Rocket } from "lucide-react";
+import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 
 type WelcomeDialogProps = {
   open: boolean;
@@ -16,28 +9,30 @@ type WelcomeDialogProps = {
 
 export function WelcomeDialog({ open, onGetStarted }: WelcomeDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent size="lg" showCloseButton={false}>
-        <DialogHeader className="flex-row items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Rocket size={18} />
-          </span>
-          <span className="grid gap-0.5">
-            <DialogTitle>Welcome to {brand.appName}</DialogTitle>
-            <DialogDescription>{brand.description.short}</DialogDescription>
-          </span>
-        </DialogHeader>
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={() => {}}
+      title={
+        <div className="flex items-center gap-3">
+          <img src="/logo.svg" alt={brand.appName} className="size-12" />
 
-        <div className="grid gap-4 p-4 pt-0">
-          <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
-            {brand.description.long}
-          </p>
+          <div className="flex flex-col items-start text-left">
+            <span>Welcome to {brand.appName}</span>
+            <span className="text-muted-foreground text-sm font-normal">
+              {brand.description.short}
+            </span>
+          </div>
         </div>
-
-        <div className="flex justify-end border-t border-border p-4">
-          <Button onClick={() => onGetStarted()}>Get started</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      }
+      footer={
+        <Button size="lg" onClick={() => onGetStarted()}>
+          Get started
+        </Button>
+      }
+    >
+      <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
+        {brand.description.long}
+      </p>
+    </ResponsiveSheet>
   );
 }

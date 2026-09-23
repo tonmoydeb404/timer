@@ -1,6 +1,6 @@
 # <!-- @brand:appName -->Tymar<!-- /@brand:appName --> Desktop
 
-<!-- @brand:descriptionLong -->Tymar is a cross-platform desktop app built with Tauri 2, React, and Rust.<!-- /@brand:descriptionLong -->
+<!-- @brand:descriptionLong -->Tymar is a minimal, powerful time tracking app for macOS, Windows, and Linux. Focus on your work while Tymar handles the rest.<!-- /@brand:descriptionLong -->
 
 Part of the [monorepo](../../README.md). This package (`@apps/desktop`) holds both the React frontend (`src/`) and the Rust backend (`src-tauri/`).
 

@@ -51,8 +51,8 @@
     "createUpdaterArtifacts": true,
     "publisher": "Tonmoy Deb",
     "category": "public.app-category.developer-tools",
-    "shortDescription": "A cross-platform desktop app built with Tauri.",
-    "longDescription": "Tymar is a cross-platform desktop app built with Tauri 2, React, and Rust.",
+    "shortDescription": "Effortless time tracking for focused work.",
+    "longDescription": "Tymar is a minimal, powerful time tracking app for macOS, Windows, and Linux. Focus on your work while Tymar handles the rest.",
     "copyright": "Copyright (c) 2026 Tonmoy Deb",
     "icon": [
       "icons/32x32.png",

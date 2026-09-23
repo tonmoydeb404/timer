@@ -37,7 +37,7 @@
     "eslint": "^9",
     "typescript": "^5"
   },
-  "description": "Tymar website — A cross-platform desktop app built with Tauri.",
+  "description": "Tymar website — Effortless time tracking for focused work.",
   "keywords": [
     "nextjs",
     "website",
