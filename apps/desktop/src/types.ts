@@ -39,7 +39,8 @@ export type SegmentView = {
 
 export type PendingEntry = {
   local_id: string;
-  task_id: string;
+  task_id: string | null;
+  project_id: string | null;
   type: SegmentType;
   started_at: string;
   ended_at: string;
@@ -50,6 +51,8 @@ export type TimerView = {
   status: TimerStatus;
   task_id: string | null;
   task_title: string | null;
+  project_id: string | null;
+  project_title: string | null;
   started_at_ms: number | null;
   total_ms: number;
   work_ms: number;

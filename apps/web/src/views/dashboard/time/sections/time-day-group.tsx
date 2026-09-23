@@ -63,7 +63,11 @@ export function TimeDayGroup({
         limit: 50,
       });
       setEntries(rows);
-      const uniqueTaskIds = Array.from(new Set(rows.map((e) => e.taskId)));
+      const uniqueTaskIds = Array.from(
+        new Set(
+          rows.map((e) => e.taskId).filter((id): id is string => id !== null),
+        ),
+      );
       const tasks = await Promise.all(uniqueTaskIds.map((id) => getTask(id)));
       setTaskById(
         Object.fromEntries(

@@ -1,6 +1,8 @@
 "use client";
 
+import { DrawerDescriptionProps } from "@base-ui/react";
 import * as React from "react";
+import { useIsMobile } from "../hooks/use-mobile";
 import {
   Drawer,
   DrawerContent,
@@ -17,13 +19,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "./sheet";
-import { useIsMobile } from "../hooks/use-mobile";
 
 type ResponsiveSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: React.ReactNode;
   description?: React.ReactNode;
+  descriptionProps?: DrawerDescriptionProps;
+
   /** Sheet side on desktop. Ignored on mobile (bottom drawer). */
   side?: "right" | "left" | "top" | "bottom";
   footer?: React.ReactNode;
@@ -40,6 +43,7 @@ export function ResponsiveSheet({
   onOpenChange,
   title,
   description,
+  descriptionProps,
   side = "right",
   footer,
   children,
@@ -50,14 +54,16 @@ export function ResponsiveSheet({
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent>
-          <DrawerHeader className="text-left">
+          <DrawerHeader className="text-left mb-5">
             <DrawerTitle>{title}</DrawerTitle>
             {description && (
-              <DrawerDescription>{description}</DrawerDescription>
+              <DrawerDescription {...descriptionProps}>
+                {description}
+              </DrawerDescription>
             )}
           </DrawerHeader>
           <div className="grid gap-3 px-4">{children}</div>
-          {footer && <DrawerFooter>{footer}</DrawerFooter>}
+          {footer && <DrawerFooter className="mt-5">{footer}</DrawerFooter>}
         </DrawerContent>
       </Drawer>
     );
@@ -68,7 +74,11 @@ export function ResponsiveSheet({
       <SheetContent side={side}>
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
-          {description && <SheetDescription>{description}</SheetDescription>}
+          {description && (
+            <SheetDescription {...descriptionProps}>
+              {description}
+            </SheetDescription>
+          )}
         </SheetHeader>
         <div className="grid gap-3 px-4">{children}</div>
         {footer && <SheetFooter>{footer}</SheetFooter>}

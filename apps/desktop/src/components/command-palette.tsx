@@ -1,4 +1,4 @@
-import { Home, Settings } from "lucide-react";
+import { Clock3, Home, Settings } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -51,6 +51,10 @@ export function CommandPalette() {
             <CommandItem onSelect={() => go("/")}>
               <Home />
               <span>Home</span>
+            </CommandItem>
+            <CommandItem onSelect={() => go("/times")}>
+              <Clock3 />
+              <span>Times</span>
             </CommandItem>
             <CommandItem
               onSelect={() => {

@@ -29,7 +29,8 @@ export function entryDurationMs(
   if (!endedAt) return 0;
   const start = toEpochMs(startedAt);
   const end = toEpochMs(endedAt);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
+    return 0;
   return end - start;
 }
 
@@ -72,7 +73,9 @@ export function totalsForDay(
   timeZone: string,
   day: string,
 ): DayTotal {
-  const totals = aggregateDayTotals(entries, timeZone).find((d) => d.day === day);
+  const totals = aggregateDayTotals(entries, timeZone).find(
+    (d) => d.day === day,
+  );
   return totals ?? { day, workMs: 0, breakMs: 0, totalMs: 0 };
 }
 
@@ -123,22 +126,26 @@ export function lastNDayKeys(
 
 /**
  * Per-project totals (no midnight splitting needed — attribution is by entry,
- * not by day). `taskToProject` maps taskId → projectId; entries whose task is
- * unknown land under "unknown".
+ * not by day). Prefers the entry's own `projectId`; falls back to resolving
+ * via `taskToProject` (taskId → projectId) when only a task is set. Entries
+ * with neither land under "unassigned".
  */
 export function aggregateByProject(
-  entries: (EntryLike & { taskId: string })[],
+  entries: (EntryLike & { taskId: string | null; projectId: string | null })[],
   taskToProject: Map<string, string> | Record<string, string>,
 ): ProjectTotal[] {
   const lookup =
     taskToProject instanceof Map
-      ? (id: string) => taskToProject.get(id) ?? "unknown"
-      : (id: string) => taskToProject[id] ?? "unknown";
+      ? (id: string) => taskToProject.get(id)
+      : (id: string) => taskToProject[id];
   const byProject = new Map<string, ProjectTotal>();
   for (const entry of entries) {
     const duration = entryDurationMs(entry.startedAt, entry.endedAt);
     if (duration <= 0) continue;
-    const projectId = lookup(entry.taskId);
+    const projectId =
+      entry.projectId ??
+      (entry.taskId ? lookup(entry.taskId) : undefined) ??
+      "unassigned";
     const row =
       byProject.get(projectId) ??
       ({ projectId, workMs: 0, breakMs: 0, totalMs: 0 } as ProjectTotal);
@@ -167,9 +174,7 @@ export function groupEntriesByStartDay<T extends EntryLike>(
   return [...groups.entries()]
     .map(([day, list]) => ({
       day,
-      entries: list.sort((a, b) =>
-        b.startedAt.localeCompare(a.startedAt),
-      ),
+      entries: list.sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     }))
     .sort((a, b) => b.day.localeCompare(a.day));
 }

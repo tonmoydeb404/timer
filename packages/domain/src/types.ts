@@ -62,8 +62,11 @@ export type EntryType = "WORK" | "BREAK";
 
 export type TimeEntry = AppwriteDoc & {
   userId: string;
-  /** Required: breaks belong to the active task (MVP decision). */
-  taskId: string;
+  /** Null when tracked without a task (project-only or fully unassigned). */
+  taskId: string | null;
+  /** Null when tracked without a project. Set even when a task is chosen, so
+   * project totals don't require a task lookup. */
+  projectId: string | null;
   type: EntryType;
   startedAt: string;
   /** Null while the entry is still open (should only happen locally). */

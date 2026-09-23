@@ -119,7 +119,10 @@ const TABLES = [
     name: "Time entries",
     columns: [
       str("userId", 36, true),
-      str("taskId", 36, true),
+      // Optional: entries can be tracked without a task (project-only or
+      // fully unassigned) — see AGENTS.md desktop timer flow.
+      str("taskId", 36, false),
+      str("projectId", 36, false),
       en("type", ["WORK", "BREAK"], "WORK"),
       dt("startedAt", true),
       dt("endedAt"),
@@ -127,6 +130,12 @@ const TABLES = [
     indexes: [
       idx("by_user_started", "key", ["userId", "startedAt"], ["ASC", "ASC"]),
       idx("by_task_started", "key", ["taskId", "startedAt"], ["ASC", "ASC"]),
+      idx(
+        "by_project_started",
+        "key",
+        ["projectId", "startedAt"],
+        ["ASC", "ASC"],
+      ),
     ],
   },
 ];
@@ -210,7 +219,22 @@ async function ensureTable(spec) {
   for (const col of spec.columns) {
     const colPath = `${base}/${spec.id}/columns/${col.key}`;
     try {
-      await api("GET", colPath);
+      const existing = await api("GET", colPath);
+      // Existing environments may have been provisioned before a column's
+      // `required` flag changed in the spec (e.g. taskId true -> false) —
+      // the TablesDB API needs an explicit update call for that, it won't
+      // happen just by re-running the create call.
+      if (existing.required !== col.payload.required) {
+        await api(
+          "PATCH",
+          `${base}/${spec.id}/columns/${col.kind}/${col.key}`,
+          // PATCH requires an explicit `default` even when unchanged.
+          { ...col.payload, default: col.payload.default ?? null },
+        );
+        console.log(
+          `  column "${spec.id}.${col.key}" updated (required=${col.payload.required})`,
+        );
+      }
     } catch (err) {
       if (err.status !== 404) throw err;
       await api("POST", `${base}/${spec.id}/columns/${col.kind}`, col.payload);

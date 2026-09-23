@@ -63,7 +63,8 @@ pub fn rebuild_menu(app: &AppHandle) {
             let title = view
                 .task_title
                 .clone()
-                .unwrap_or_else(|| "Unknown task".into());
+                .or_else(|| view.project_title.clone())
+                .unwrap_or_else(|| "Untitled session".into());
             let state_label = if view.status == crate::timer::TimerStatus::Break {
                 "On break"
             } else {

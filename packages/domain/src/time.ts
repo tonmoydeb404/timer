@@ -38,8 +38,7 @@ export function dayKey(epochMs: number, timeZone: string): string {
     day: "2-digit",
   }).formatToParts(new Date(epochMs));
 
-  const get = (type: string) =>
-    parts.find((p) => p.type === type)?.value ?? "";
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
@@ -116,6 +115,47 @@ export function dayBounds(
   return { startMs, endMs };
 }
 
+/** Monday-first weekday index (0 = Mon .. 6 = Sun) of an instant in `timeZone`. */
+function weekdayIndexMonFirst(epochMs: number, timeZone: string): number {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  }).format(new Date(epochMs));
+  const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const idx = order.indexOf(weekday);
+  return idx === -1 ? 0 : idx;
+}
+
+/** "YYYY-MM-DD" keys of the calendar week (Mon\u2013Sun) containing `nowMs`. */
+export function currentWeekDayKeys(
+  timeZone: string,
+  nowMs: number = Date.now(),
+): string[] {
+  const idx = weekdayIndexMonFirst(nowMs, timeZone);
+  const [y, m, d] = parseDayKey(dayKey(nowMs, timeZone));
+  // Anchor on UTC noon of "today" then step by whole days \u2014 avoids DST
+  // edges shifting the calendar date (mirrors lastNDayKeys' approach).
+  const todayNoonUtc = Date.UTC(y, m - 1, d, 12);
+  const mondayNoonUtc = todayNoonUtc - idx * 24 * 3600 * 1000;
+  return Array.from({ length: 7 }, (_, i) =>
+    dayKey(mondayNoonUtc + i * 24 * 3600 * 1000, timeZone),
+  );
+}
+
+/** [startMs, endMs) of the calendar week (Mon\u2013Sun) containing `nowMs`. */
+export function currentWeekBounds(
+  timeZone: string,
+  nowMs: number = Date.now(),
+): { startMs: number; endMs: number } {
+  const keys = currentWeekDayKeys(timeZone, nowMs);
+  const [y1, m1, d1] = parseDayKey(keys[0] ?? dayKey(nowMs, timeZone));
+  const [y2, m2, d2] = parseDayKey(keys[6] ?? dayKey(nowMs, timeZone));
+  const startMs = zonedTimeToUtc(y1, m1, d1, 0, 0, timeZone);
+  const lastDayStart = zonedTimeToUtc(y2, m2, d2, 0, 0, timeZone);
+  const { endMs } = dayBounds(lastDayStart, timeZone);
+  return { startMs, endMs };
+}
+
 export type DaySlice = { day: string; durationMs: number };
 
 /**
@@ -138,7 +178,10 @@ export function splitEntryAcrossDays(
   while (cursor < end) {
     const { endMs } = dayBounds(cursor, timeZone);
     const sliceEnd = Math.min(end, endMs);
-    slices.push({ day: dayKey(cursor, timeZone), durationMs: sliceEnd - cursor });
+    slices.push({
+      day: dayKey(cursor, timeZone),
+      durationMs: sliceEnd - cursor,
+    });
     cursor = sliceEnd;
   }
   return slices;

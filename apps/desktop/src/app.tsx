@@ -1,15 +1,14 @@
 import { Skeleton } from "@packages/ui/components/skeleton";
 import { Toaster } from "@packages/ui/components/sonner";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
-import { ModalProvider } from "./context/modal-context";
 import { AppProvider, useApp } from "./context/app-context";
+import { ModalProvider } from "./context/modal-context";
 import { TimerProvider } from "./context/timer-context";
 import { TabLayout } from "./layouts/tab-layout";
 import { LoginScreen } from "./screens/auth/login";
-import { HistoryScreen } from "./screens/history";
+import { HomeScreen } from "./screens/home";
 import { SettingsScreen } from "./screens/settings";
-import { TasksScreen } from "./screens/tasks";
-import { TodayScreen } from "./screens/today";
+import { TimesScreen } from "./screens/times";
 
 function LoadingShell() {
   return (
@@ -52,9 +51,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route element={<TabLayout />}>
-        <Route index element={<TodayScreen />} />
-        <Route path="tasks" element={<TasksScreen />} />
-        <Route path="history" element={<HistoryScreen />} />
+        <Route index element={<HomeScreen />} />
+        <Route path="times" element={<TimesScreen />} />
         <Route path="settings" element={<SettingsScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

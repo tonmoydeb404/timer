@@ -67,11 +67,21 @@ pub async fn ack_entries(
 #[tauri::command]
 pub async fn start_timer(
     app: AppHandle,
-    task_id: String,
-    task_title: String,
+    task_id: Option<String>,
+    task_title: Option<String>,
+    project_id: Option<String>,
+    project_title: Option<String>,
 ) -> Result<crate::timer::TimerView, String> {
     mutate_timer(&app, |store, now| {
-        crate::timer::start(store, &task_id, &task_title, now).map(|_| Vec::new())
+        crate::timer::start(
+            store,
+            task_id.as_deref(),
+            task_title.as_deref(),
+            project_id.as_deref(),
+            project_title.as_deref(),
+            now,
+        )
+        .map(|_| Vec::new())
     })
     .await
 }
@@ -100,11 +110,20 @@ pub async fn stop_timer(app: AppHandle) -> Result<crate::timer::TimerView, Strin
 #[tauri::command]
 pub async fn switch_task(
     app: AppHandle,
-    task_id: String,
-    task_title: String,
+    task_id: Option<String>,
+    task_title: Option<String>,
+    project_id: Option<String>,
+    project_title: Option<String>,
 ) -> Result<crate::timer::TimerView, String> {
     mutate_timer(&app, |store, now| {
-        crate::timer::switch_task(store, &task_id, &task_title, now)
+        crate::timer::switch_task(
+            store,
+            task_id.as_deref(),
+            task_title.as_deref(),
+            project_id.as_deref(),
+            project_title.as_deref(),
+            now,
+        )
     })
     .await
 }

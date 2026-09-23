@@ -103,7 +103,8 @@ export function toTimeEntry(doc: Doc): TimeEntry {
     $updatedAt: doc.$updatedAt,
     $permissions: doc.$permissions,
     userId: String(doc.userId ?? ""),
-    taskId: String(doc.taskId ?? ""),
+    taskId: str(doc.taskId),
+    projectId: str(doc.projectId),
     type: (doc.type as EntryType) ?? "WORK",
     startedAt: String(doc.startedAt ?? ""),
     endedAt: str(doc.endedAt),
@@ -436,6 +437,8 @@ export async function getTask(taskId: string): Promise<Task | null> {
 
 export type TimeEntryInput = {
   taskId: string;
+  /** Denormalized alongside taskId; defaults to the task's project when omitted. */
+  projectId?: string | null;
   type?: EntryType;
   startedAt: string;
   endedAt: string | null;
@@ -483,7 +486,7 @@ export async function listTimeEntries(
   let rows = (res.documents as unknown as Doc[]).map(toTimeEntry);
   if (opts.taskIds && opts.taskIds.length > 0) {
     const set = new Set(opts.taskIds);
-    rows = rows.filter((e) => set.has(e.taskId));
+    rows = rows.filter((e) => e.taskId !== null && set.has(e.taskId));
   }
   return rows;
 }
@@ -702,6 +705,7 @@ export async function createTimeEntry(
     {
       userId,
       taskId: input.taskId,
+      projectId: input.projectId ?? null,
       type: input.type ?? "WORK",
       startedAt: input.startedAt,
       endedAt: input.endedAt,

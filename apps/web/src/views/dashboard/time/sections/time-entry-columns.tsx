@@ -57,9 +57,11 @@ export function buildTimeEntryColumns({
       id: "task",
       header: "Task",
       cell: ({ row }) => {
-        const task = taskById[row.original.taskId];
+        const task = row.original.taskId ? taskById[row.original.taskId] : null;
         return (
-          <span className="font-medium">{task?.title ?? "Deleted task"}</span>
+          <span className="font-medium">
+            {task?.title ?? (row.original.taskId ? "Deleted task" : "No task")}
+          </span>
         );
       },
     },
@@ -67,7 +69,7 @@ export function buildTimeEntryColumns({
       id: "project",
       header: "Project",
       cell: ({ row }) => {
-        const task = taskById[row.original.taskId];
+        const task = row.original.taskId ? taskById[row.original.taskId] : null;
         return task ? (
           <Badge variant="outline">{projectName(task.projectId)}</Badge>
         ) : null;

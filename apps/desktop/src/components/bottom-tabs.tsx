@@ -1,38 +1,42 @@
-import { History, List, Settings, Timer } from "lucide-react";
-import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { Clock3, Home, Settings } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 const TABS = [
-  { to: "/", label: "Today", icon: Timer, end: true },
-  { to: "/tasks", label: "Tasks", icon: List, end: false },
-  { to: "/history", label: "History", icon: History, end: false },
+  { to: "/", label: "Home", icon: Home, end: true },
+  { to: "/times", label: "Times", icon: Clock3, end: false },
   { to: "/settings", label: "Settings", icon: Settings, end: false },
 ] as const;
 
+// Floating pill navbar, overlaid on the scrollable content below it.
 export function BottomTabs() {
   return (
     <nav
       aria-label="Primary"
-      className="grid h-14 shrink-0 grid-cols-4 border-t border-border bg-card/95 px-3 backdrop-blur-md"
+      className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-4"
     >
-      {TABS.map((tab) => (
-        <NavLink
-          key={tab.to}
-          to={tab.to}
-          end={tab.end}
-          className={({ isActive }) =>
-            cn(
-              "flex flex-col items-center justify-center gap-0.5 transition-colors",
-              isActive
-                ? "font-semibold text-emerald-600 dark:text-emerald-400"
-                : "font-medium text-muted-foreground hover:text-ink",
-            )
-          }
-        >
-          <tab.icon size={20} />
-          <span className="font-mono text-[10px]">{tab.label}</span>
-        </NavLink>
-      ))}
+      <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-border bg-card/95 p-1.5 shadow-lg backdrop-blur-md">
+        {TABS.map((tab) => (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            end={tab.end}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-1.5 rounded-full px-4 py-2 transition-colors",
+                isActive
+                  ? "bg-emerald-600 text-white"
+                  : "font-medium text-muted-foreground hover:text-ink",
+              )
+            }
+          >
+            <tab.icon size={16} />
+            <span className="font-mono text-[10px] font-semibold">
+              {tab.label}
+            </span>
+          </NavLink>
+        ))}
+      </div>
     </nav>
   );
 }

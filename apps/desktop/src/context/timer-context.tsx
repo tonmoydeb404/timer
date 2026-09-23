@@ -20,16 +20,23 @@ type TimerContextValue = {
   busy: boolean;
   /** Epoch ms when `view` was received — drives the ticking display. */
   fetchedAt: number;
-  /** Task selected for start/switch. Shared by Today + Tasks tabs. */
-  focusId: string | null;
-  setFocusId: (id: string | null) => void;
 
   refresh: () => Promise<void>;
-  start: (taskId: string, taskTitle: string) => Promise<void>;
+  start: (
+    taskId: string | null,
+    taskTitle: string | null,
+    projectId: string | null,
+    projectTitle: string | null,
+  ) => Promise<void>;
   takeBreak: () => Promise<void>;
   resume: () => Promise<void>;
   stop: () => Promise<void>;
-  switchTo: (taskId: string, taskTitle: string) => Promise<void>;
+  switchTo: (
+    taskId: string | null,
+    taskTitle: string | null,
+    projectId: string | null,
+    projectTitle: string | null,
+  ) => Promise<void>;
 };
 
 const TimerContext = createContext<TimerContextValue | null>(null);
@@ -39,7 +46,6 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<TimerView | null>(null);
   const [busy, setBusy] = useState(false);
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
-  const [focusId, setFocusId] = useState<string | null>(null);
   const mounted = useRef(true);
   const uploading = useRef<Set<string>>(new Set());
   const userId = auth?.user?.id ?? null;
@@ -111,8 +117,16 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   );
 
   const start = useCallback(
-    (taskId: string, taskTitle: string) =>
-      run(() => api.startTimer(taskId, taskTitle), "Start"),
+    (
+      taskId: string | null,
+      taskTitle: string | null,
+      projectId: string | null,
+      projectTitle: string | null,
+    ) =>
+      run(
+        () => api.startTimer(taskId, taskTitle, projectId, projectTitle),
+        "Start",
+      ),
     [run],
   );
   const takeBreak = useCallback(
@@ -125,8 +139,16 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   );
   const stop = useCallback(() => run(() => api.stopTimer(), "Stop"), [run]);
   const switchTo = useCallback(
-    (taskId: string, taskTitle: string) =>
-      run(() => api.switchTask(taskId, taskTitle), "Switch"),
+    (
+      taskId: string | null,
+      taskTitle: string | null,
+      projectId: string | null,
+      projectTitle: string | null,
+    ) =>
+      run(
+        () => api.switchTask(taskId, taskTitle, projectId, projectTitle),
+        "Switch",
+      ),
     [run],
   );
 
@@ -134,8 +156,6 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     view,
     busy,
     fetchedAt,
-    focusId,
-    setFocusId,
     refresh,
     start,
     takeBreak,

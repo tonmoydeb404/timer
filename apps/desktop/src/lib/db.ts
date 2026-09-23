@@ -10,8 +10,8 @@ import {
   type TaskStatus,
   type TimeEntry,
 } from "@packages/domain/index";
-import { ID, Permission, Query, Role } from "appwrite";
 import type { Models } from "appwrite";
+import { ID, Permission, Query, Role } from "appwrite";
 import { getDatabases } from "./appwrite";
 
 function requireDatabases() {
@@ -85,7 +85,8 @@ export function toTimeEntry(doc: Doc): TimeEntry {
     $updatedAt: doc.$updatedAt,
     $permissions: doc.$permissions,
     userId: String(doc.userId ?? ""),
-    taskId: String(doc.taskId ?? ""),
+    taskId: str(doc.taskId),
+    projectId: str(doc.projectId),
     type: (doc.type as EntryType) ?? "WORK",
     startedAt: String(doc.startedAt ?? ""),
     endedAt: str(doc.endedAt),
@@ -112,6 +113,77 @@ export async function listTasks(userId: string): Promise<Task[]> {
     Query.limit(200),
   ]);
   return (res.documents as unknown as Doc[]).map(toTask);
+}
+
+/** Server-side search for the "start timer"/"manual entry" project pickers. */
+export async function queryProjects(
+  userId: string,
+  opts: { search?: string; limit?: number } = {},
+): Promise<Project[]> {
+  const queries = [
+    Query.equal("userId", userId),
+    Query.isNull("deletedAt"),
+    Query.equal("status", "ACTIVE" satisfies ProjectStatus),
+    Query.orderDesc("$updatedAt"),
+    Query.limit(opts.limit ?? 20),
+  ];
+  if (opts.search?.trim())
+    queries.push(Query.search("name", opts.search.trim()));
+  const res = await requireDatabases().listDocuments(
+    DB,
+    COLLECTIONS.projects,
+    queries,
+  );
+  return (res.documents as unknown as Doc[]).map(toProject);
+}
+
+export async function getProject(projectId: string): Promise<Project | null> {
+  try {
+    const doc = (await requireDatabases().getDocument(
+      DB,
+      COLLECTIONS.projects,
+      projectId,
+    )) as unknown as Doc;
+    return doc.deletedAt ? null : toProject(doc);
+  } catch {
+    return null;
+  }
+}
+
+/** Server-side search for the "start timer"/"manual entry" task pickers. */
+export async function queryTasks(
+  userId: string,
+  opts: { projectId?: string; search?: string; limit?: number } = {},
+): Promise<Task[]> {
+  const queries = [
+    Query.equal("userId", userId),
+    Query.isNull("deletedAt"),
+    Query.notEqual("status", "DONE" satisfies TaskStatus),
+    Query.orderDesc("$updatedAt"),
+    Query.limit(opts.limit ?? 20),
+  ];
+  if (opts.projectId) queries.push(Query.equal("projectId", opts.projectId));
+  if (opts.search?.trim())
+    queries.push(Query.search("title", opts.search.trim()));
+  const res = await requireDatabases().listDocuments(
+    DB,
+    COLLECTIONS.tasks,
+    queries,
+  );
+  return (res.documents as unknown as Doc[]).map(toTask);
+}
+
+export async function getTask(taskId: string): Promise<Task | null> {
+  try {
+    const doc = (await requireDatabases().getDocument(
+      DB,
+      COLLECTIONS.tasks,
+      taskId,
+    )) as unknown as Doc;
+    return doc.deletedAt ? null : toTask(doc);
+  } catch {
+    return null;
+  }
 }
 
 export async function createTask(
@@ -155,17 +227,22 @@ export async function listTimeEntries(
   userId: string,
   limit = 200,
 ): Promise<TimeEntry[]> {
-  const res = await requireDatabases().listDocuments(DB, COLLECTIONS.timeEntries, [
-    Query.equal("userId", userId),
-    Query.orderDesc("startedAt"),
-    Query.limit(Math.min(Math.max(limit, 1), 500)),
-  ]);
+  const res = await requireDatabases().listDocuments(
+    DB,
+    COLLECTIONS.timeEntries,
+    [
+      Query.equal("userId", userId),
+      Query.orderDesc("startedAt"),
+      Query.limit(Math.min(Math.max(limit, 1), 500)),
+    ],
+  );
   return (res.documents as unknown as Doc[]).map(toTimeEntry);
 }
 
 export type PendingUpload = {
   local_id: string;
-  task_id: string;
+  task_id: string | null;
+  project_id: string | null;
   type: "WORK" | "BREAK";
   started_at: string;
   ended_at: string;
@@ -185,6 +262,7 @@ export async function uploadTimeEntries(
       {
         userId,
         taskId: entry.task_id,
+        projectId: entry.project_id,
         type: entry.type,
         startedAt: entry.started_at,
         endedAt: entry.ended_at,
@@ -194,4 +272,34 @@ export async function uploadTimeEntries(
     uploaded.push(entry.local_id);
   }
   return uploaded;
+}
+
+/** Creates a manual (already-closed) time entry, e.g. from the desktop
+ * "Add manual entry" sheet. Project is required; task is optional. */
+export async function createManualTimeEntry(
+  userId: string,
+  input: {
+    taskId: string | null;
+    projectId: string | null;
+    type: EntryType;
+    startedAt: string;
+    endedAt: string;
+  },
+): Promise<TimeEntry> {
+  if (!input.projectId) throw new Error("A project is required.");
+  const doc = (await requireDatabases().createDocument(
+    DB,
+    COLLECTIONS.timeEntries,
+    ID.unique(),
+    {
+      userId,
+      taskId: input.taskId,
+      projectId: input.projectId,
+      type: input.type,
+      startedAt: input.startedAt,
+      endedAt: input.endedAt,
+    },
+    ownerPermissions(userId),
+  )) as unknown as Doc;
+  return toTimeEntry(doc);
 }

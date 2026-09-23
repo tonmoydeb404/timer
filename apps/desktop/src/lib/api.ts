@@ -10,13 +10,33 @@ export const api = {
   getTimerState: () => invoke<TimerView>("get_timer_state"),
   ackEntries: (localIds: string[]) =>
     invoke<TimerView>("ack_entries", { localIds }),
-  startTimer: (taskId: string, taskTitle: string) =>
-    invoke<TimerView>("start_timer", { taskId, taskTitle }),
+  startTimer: (
+    taskId: string | null,
+    taskTitle: string | null,
+    projectId: string | null,
+    projectTitle: string | null,
+  ) =>
+    invoke<TimerView>("start_timer", {
+      taskId,
+      taskTitle,
+      projectId,
+      projectTitle,
+    }),
   takeBreak: () => invoke<TimerView>("take_break"),
   resumeTimer: () => invoke<TimerView>("resume_timer"),
   stopTimer: () => invoke<TimerView>("stop_timer"),
-  switchTask: (taskId: string, taskTitle: string) =>
-    invoke<TimerView>("switch_task", { taskId, taskTitle }),
+  switchTask: (
+    taskId: string | null,
+    taskTitle: string | null,
+    projectId: string | null,
+    projectTitle: string | null,
+  ) =>
+    invoke<TimerView>("switch_task", {
+      taskId,
+      taskTitle,
+      projectId,
+      projectTitle,
+    }),
 
   getSettings: () => invoke<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>

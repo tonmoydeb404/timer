@@ -41,7 +41,7 @@ export function UpdateTimeEntryModal({
   useEffect(() => {
     if (!entry) return;
     setValidationError(null);
-    setTaskId(entry.taskId);
+    setTaskId(entry.taskId ?? "");
     setType(entry.type);
     setStart(isoToLocalInput(entry.startedAt));
     setEnd(isoToLocalInput(entry.endedAt));

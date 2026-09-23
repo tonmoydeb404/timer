@@ -46,8 +46,12 @@ impl Segment {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveTimer {
-    pub task_id: String,
-    pub task_title: String,
+    /// None when tracking without a task (project-only or fully unassigned).
+    pub task_id: Option<String>,
+    pub task_title: Option<String>,
+    /// None when tracking without a project.
+    pub project_id: Option<String>,
+    pub project_title: Option<String>,
     pub status: TimerStatus,
     pub started_at_ms: i64,
     pub segments: Vec<Segment>,
@@ -57,7 +61,8 @@ pub struct ActiveTimer {
 pub struct PendingEntry {
     /// Local id for upload acknowledgement (frontend confirms by id).
     pub local_id: String,
-    pub task_id: String,
+    pub task_id: Option<String>,
+    pub project_id: Option<String>,
     #[serde(rename = "type")]
     pub kind: SegmentType,
     pub started_at: String,
@@ -145,16 +150,20 @@ fn close_open_segment(active: &mut ActiveTimer, at_ms: i64) {
 
 pub fn start(
     store: &mut TimerStore,
-    task_id: &str,
-    task_title: &str,
+    task_id: Option<&str>,
+    task_title: Option<&str>,
+    project_id: Option<&str>,
+    project_title: Option<&str>,
     at_ms: i64,
 ) -> Result<(), TransitionError> {
     if store.active.is_some() {
         return Err(TransitionError::AlreadyRunning);
     }
     store.active = Some(ActiveTimer {
-        task_id: task_id.to_string(),
-        task_title: task_title.to_string(),
+        task_id: task_id.map(str::to_string),
+        task_title: task_title.map(str::to_string),
+        project_id: project_id.map(str::to_string),
+        project_title: project_title.map(str::to_string),
         status: TimerStatus::Working,
         started_at_ms: at_ms,
         segments: vec![Segment {
@@ -204,15 +213,18 @@ pub fn stop(store: &mut TimerStore, at_ms: i64) -> Result<Vec<PendingEntry>, Tra
 }
 
 /// Switch task: closes the current timer into entries and starts a fresh
-/// one for the new task. Single user action, no manual stop needed.
+/// one for the new task/project. Single user action, no manual stop needed.
 pub fn switch_task(
     store: &mut TimerStore,
-    task_id: &str,
-    task_title: &str,
+    task_id: Option<&str>,
+    task_title: Option<&str>,
+    project_id: Option<&str>,
+    project_title: Option<&str>,
     at_ms: i64,
 ) -> Result<Vec<PendingEntry>, TransitionError> {
     let entries = stop(store, at_ms)?;
-    start(store, task_id, task_title, at_ms).map_err(|_| TransitionError::NotRunning)?;
+    start(store, task_id, task_title, project_id, project_title, at_ms)
+        .map_err(|_| TransitionError::NotRunning)?;
     Ok(entries)
 }
 
@@ -229,6 +241,7 @@ fn segments_to_entries(store: &mut TimerStore, active: &ActiveTimer) -> Vec<Pend
             Some(PendingEntry {
                 local_id: format!("{}-{}", s.started_at_ms, store.next_id),
                 task_id: active.task_id.clone(),
+                project_id: active.project_id.clone(),
                 kind: s.kind,
                 started_at: to_iso(s.started_at_ms),
                 ended_at: to_iso(ended),
@@ -254,6 +267,8 @@ pub struct TimerView {
     pub status: TimerStatus,
     pub task_id: Option<String>,
     pub task_title: Option<String>,
+    pub project_id: Option<String>,
+    pub project_title: Option<String>,
     pub started_at_ms: Option<i64>,
     pub total_ms: i64,
     pub work_ms: i64,
@@ -271,6 +286,8 @@ pub fn view(store: &TimerStore, at_ms: i64) -> TimerView {
             status: TimerStatus::Idle,
             task_id: None,
             task_title: None,
+            project_id: None,
+            project_title: None,
             started_at_ms: None,
             total_ms: 0,
             work_ms: 0,
@@ -304,8 +321,10 @@ pub fn view(store: &TimerStore, at_ms: i64) -> TimerView {
 
     TimerView {
         status: active.status,
-        task_id: Some(active.task_id.clone()),
-        task_title: Some(active.task_title.clone()),
+        task_id: active.task_id.clone(),
+        task_title: active.task_title.clone(),
+        project_id: active.project_id.clone(),
+        project_title: active.project_title.clone(),
         started_at_ms: Some(active.started_at_ms),
         total_ms: at_ms.saturating_sub(active.started_at_ms),
         work_ms,
@@ -322,7 +341,15 @@ mod tests {
 
     fn running_store() -> TimerStore {
         let mut store = TimerStore::default();
-        start(&mut store, "task-1", "Build dashboard", 1_000).unwrap();
+        start(
+            &mut store,
+            Some("task-1"),
+            Some("Build dashboard"),
+            None,
+            None,
+            1_000,
+        )
+        .unwrap();
         store
     }
 
@@ -338,8 +365,17 @@ mod tests {
     #[test]
     fn start_twice_is_rejected() {
         let mut store = running_store();
-        assert!(start(&mut store, "task-2", "Other", 2_000).is_err());
-        assert_eq!(store.active.as_ref().unwrap().task_id, "task-1");
+        assert!(start(&mut store, Some("task-2"), Some("Other"), None, None, 2_000).is_err());
+        assert_eq!(store.active.as_ref().unwrap().task_id.as_deref(), Some("task-1"));
+    }
+
+    #[test]
+    fn start_without_task_or_project_is_allowed() {
+        let mut store = TimerStore::default();
+        start(&mut store, None, None, None, None, 1_000).unwrap();
+        let active = store.active.as_ref().unwrap();
+        assert!(active.task_id.is_none());
+        assert!(active.project_id.is_none());
     }
 
     #[test]
@@ -382,11 +418,11 @@ mod tests {
     #[test]
     fn switch_closes_old_and_starts_new() {
         let mut store = running_store();
-        let entries = switch_task(&mut store, "task-2", "Other", 5_000).unwrap();
+        let entries = switch_task(&mut store, Some("task-2"), Some("Other"), None, None, 5_000).unwrap();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].task_id, "task-1");
+        assert_eq!(entries[0].task_id.as_deref(), Some("task-1"));
         let active = store.active.as_ref().unwrap();
-        assert_eq!(active.task_id, "task-2");
+        assert_eq!(active.task_id.as_deref(), Some("task-2"));
         assert_eq!(active.started_at_ms, 5_000);
         assert_eq!(active.status, TimerStatus::Working);
     }
@@ -414,7 +450,7 @@ mod tests {
     fn restart_recovery_is_timestamp_based() {
         // Simulate: start at 10:00, app closes, reopens at 11:15.
         let mut store = TimerStore::default();
-        start(&mut store, "task-1", "T", 10 * 3_600_000).unwrap();
+        start(&mut store, Some("task-1"), Some("T"), None, None, 10 * 3_600_000).unwrap();
         let reloaded: TimerStore =
             serde_json::from_str(&serde_json::to_string(&store).unwrap()).unwrap();
         let v = view(&reloaded, 11 * 3_600_000 + 15 * 60_000);
@@ -428,7 +464,7 @@ mod tests {
         // day-splitting happens in analytics (packages/domain).
         let mut store = TimerStore::default();
         let start_ms = 1_790_031_600_000; // 2026-09-21T23:00:00Z
-        start(&mut store, "task-1", "T", start_ms).unwrap();
+        start(&mut store, Some("task-1"), Some("T"), None, None, start_ms).unwrap();
         let entries = stop(&mut store, start_ms + 3 * 3_600_000).unwrap();
         assert_eq!(entries.len(), 1);
         assert!(entries[0].started_at.starts_with("2026-09-21T23:00"));

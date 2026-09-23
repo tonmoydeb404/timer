@@ -1,0 +1,342 @@
+import { ManualEntrySheet } from "@/components/manual-entry-sheet";
+import { StartSessionSheet } from "@/components/start-session-sheet";
+import { useApp } from "@/context/app-context";
+import { useTimer } from "@/context/timer-context";
+import { useTasks } from "@/hooks/use-tasks";
+import { useTimeEntries } from "@/hooks/use-time-entries";
+import { onOpenSwitcher } from "@/lib/api";
+import { createManualTimeEntry } from "@/lib/db";
+import { cn } from "@/lib/utils";
+import {
+  aggregateDayTotals,
+  currentWeekBounds,
+  formatDuration,
+  formatDurationShort,
+} from "@packages/domain/index";
+import { Button } from "@packages/ui/components/button";
+import {
+  ArrowLeftRight,
+  CalendarDays,
+  Clock,
+  Coffee,
+  NotebookPen,
+  Pause,
+  Play,
+  Plus,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+// Home tab: live timer, today + week stats, today's sessions. Starting a
+// timer or adding a manual entry opens a sheet where a project is required
+// and a task is optional — projects are managed on the web dashboard, tasks
+// can be quick-added here once a project is picked.
+export function HomeScreen() {
+  const { auth } = useApp();
+  const { projects, tasks, quickAdd } = useTasks();
+  const { entries, timeZone, refresh: refreshEntries } = useTimeEntries(500);
+  const { view, busy, fetchedAt, start, takeBreak, resume, stop, switchTo } =
+    useTimer();
+  const [, setTick] = useState(0);
+  const [startOpen, setStartOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [weekWorkMs, setWeekWorkMs] = useState(0);
+  const [weekBreakMs, setWeekBreakMs] = useState(0);
+
+  const userId = auth?.user?.id ?? null;
+  const status = view?.status ?? "IDLE";
+  const running = status !== "IDLE";
+  const toggleOn = status !== "IDLE";
+  const onBreak = status === "BREAK";
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  // Tray "Switch Task" opens this screen's start/switch sheet.
+  useEffect(() => {
+    const unlisten = onOpenSwitcher(() => setStartOpen(true));
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  useEffect(() => {
+    const { startMs, endMs } = currentWeekBounds(timeZone);
+    const inWeek = entries.filter((e) => {
+      const t = new Date(e.startedAt).getTime();
+      return t >= startMs && t < endMs;
+    });
+    const perDay = aggregateDayTotals(inWeek, timeZone);
+    setWeekWorkMs(perDay.reduce((sum, d) => sum + d.workMs, 0));
+    setWeekBreakMs(perDay.reduce((sum, d) => sum + d.breakMs, 0));
+  }, [entries, timeZone]);
+
+  const elapsed = running ? Math.max(0, Date.now() - fetchedAt) : 0;
+  const openKind = view?.segments.find((s) => s.ended_at_ms === null)?.type;
+  const totalMs = (view?.total_ms ?? 0) + elapsed;
+  const workMs = (view?.work_ms ?? 0) + (openKind === "WORK" ? elapsed : 0);
+  const breakMs = (view?.break_ms ?? 0) + (openKind === "BREAK" ? elapsed : 0);
+
+  const taskById = useMemo(
+    () => new Map(tasks.map((t) => [t.$id, t])),
+    [tasks],
+  );
+  const projectById = useMemo(
+    () => new Map(projects.map((p) => [p.$id, p])),
+    [projects],
+  );
+
+  const runningTaskTitle =
+    view?.task_title ??
+    (view?.task_id ? (taskById.get(view.task_id)?.title ?? null) : null);
+  const runningProjectTitle =
+    view?.project_title ??
+    (view?.project_id
+      ? (projectById.get(view.project_id)?.name ?? null)
+      : null);
+
+  function handleToggle() {
+    if (busy) return;
+    if (status === "IDLE") setStartOpen(true);
+    else void stop();
+  }
+
+  async function handleQuickAdd(projectId: string, title: string) {
+    return quickAdd(projectId, title);
+  }
+
+  return (
+    <section className="mx-auto grid h-full w-full max-w-[420px] gap-4 overflow-y-auto scrollbar-thin px-3.5 pt-4 pb-24">
+      {/* Timer card */}
+      <section className="grid gap-4 rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-1">
+          <NotebookPen size={16} className="shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
+            {runningTaskTitle ??
+              runningProjectTitle ??
+              (running ? "Untitled session" : "No active session")}
+          </span>
+          {running && runningTaskTitle && runningProjectTitle && (
+            <span className="shrink-0 font-mono text-[10px] font-medium text-muted-foreground">
+              {runningProjectTitle}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="grid">
+            <span className="font-mono text-[38px] leading-none font-bold tracking-tight tabular-nums text-ink">
+              {formatDuration(totalMs)}
+            </span>
+
+            <span className="mt-2 flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  status === "WORKING" && "animate-pulse bg-emerald-500",
+                  status === "BREAK" && "animate-pulse bg-amber-500",
+                  status === "IDLE" && "bg-slate-300 dark:bg-slate-600",
+                )}
+              />
+              <span
+                className={cn(
+                  "font-mono text-[10px] font-semibold tracking-wider uppercase",
+                  status === "WORKING" &&
+                    "text-emerald-700 dark:text-emerald-400",
+                  status === "BREAK" && "text-amber-700 dark:text-amber-400",
+                  status === "IDLE" && "text-muted-foreground",
+                )}
+              >
+                {status === "WORKING"
+                  ? "Logging time"
+                  : status === "BREAK"
+                    ? "On break"
+                    : "Ready"}
+              </span>
+            </span>
+          </div>
+          <div className="flex shrink-0 flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleToggle}
+              disabled={busy}
+              title={status === "IDLE" ? "Start a timer" : "Stop timer"}
+              aria-label={toggleOn ? "Stop timer" : "Start timer"}
+              className={cn(
+                "flex h-9 w-16 items-center rounded-full px-1 shadow-inner transition-colors",
+                toggleOn
+                  ? onBreak
+                    ? "bg-amber-500"
+                    : "bg-emerald-600"
+                  : "bg-slate-300 dark:bg-slate-700",
+                "not-disabled:cursor-pointer disabled:opacity-70",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-md transition-transform",
+                  toggleOn ? "translate-x-7" : "translate-x-0",
+                )}
+              >
+                {toggleOn ? (
+                  <Pause
+                    size={18}
+                    className={cn(
+                      "font-bold",
+                      onBreak ? "text-amber-700" : "text-emerald-700",
+                    )}
+                  />
+                ) : (
+                  <Play size={18} className="text-slate-500" />
+                )}
+              </span>
+            </button>
+            <span
+              className={cn(
+                "font-mono text-[11px] font-bold tracking-wide uppercase",
+                status === "WORKING" &&
+                  "text-emerald-700 dark:text-emerald-400",
+                status === "BREAK" && "text-amber-700 dark:text-amber-400",
+                status === "IDLE" && "text-muted-foreground",
+              )}
+            >
+              {toggleOn ? "On" : "Off"}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+          {onBreak ? (
+            <Button
+              onClick={() => void resume()}
+              disabled={busy}
+              className="bg-emerald-600 text-white hover:bg-emerald-600/90"
+            >
+              <Play size={16} />
+              Resume
+            </Button>
+          ) : (
+            <Button
+              onClick={() => void takeBreak()}
+              disabled={busy || !running}
+              className="bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-400"
+            >
+              <Coffee size={16} />
+              Break
+            </Button>
+          )}
+          <Button
+            onClick={() => setStartOpen(true)}
+            disabled={busy || !running}
+            variant="default"
+          >
+            <ArrowLeftRight size={16} />
+            Switch
+          </Button>
+        </div>
+      </section>
+
+      {/* Summaries */}
+
+      <div className="flex flex-col rounded-xl border border-border bg-card p-3.5">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="font-mono text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Today
+          </span>
+          <Clock size={16} className="text-emerald-600 dark:text-emerald-400" />
+        </div>
+        <div>
+          <span className="font-mono text-xl font-bold tabular-nums text-ink">
+            {formatDurationShort(workMs)}
+          </span>
+        </div>
+        <div className="mt-1">
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {breakMs > 0
+              ? `${formatDurationShort(breakMs)} rest taken`
+              : "No time logged yet"}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col rounded-xl border border-border bg-card p-3.5">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="font-mono text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+            This week
+          </span>
+          <CalendarDays
+            size={16}
+            className="text-blue-600 dark:text-blue-400"
+          />
+        </div>
+        <div>
+          <span className="font-mono text-xl font-bold tabular-nums text-ink">
+            {formatDurationShort(weekWorkMs)}
+          </span>
+        </div>
+        <div className="mt-1">
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {weekWorkMs > 0 || weekBreakMs > 0
+              ? `${formatDurationShort(weekBreakMs)} rest this week`
+              : "No time this week yet"}
+          </span>
+        </div>
+      </div>
+
+      <Button
+        variant="outline"
+        onClick={() => setManualOpen(true)}
+        className=""
+      >
+        <Plus size={13} />
+        Add manual entry
+      </Button>
+
+      <StartSessionSheet
+        open={startOpen}
+        onOpenChange={setStartOpen}
+        title={running ? "Switch task" : "Start timer"}
+        submitLabel={running ? "Switch" : "Start"}
+        busy={busy}
+        onQuickAdd={handleQuickAdd}
+        onSubmit={async ({ projectId, projectTitle, taskId, taskTitle }) => {
+          if (running) {
+            await switchTo(taskId, taskTitle, projectId, projectTitle);
+          } else {
+            await start(taskId, taskTitle, projectId, projectTitle);
+          }
+        }}
+      />
+
+      <ManualEntrySheet
+        open={manualOpen}
+        onOpenChange={setManualOpen}
+        busy={false}
+        onQuickAdd={handleQuickAdd}
+        onSubmit={async ({ projectId, taskId, type, startedAt, endedAt }) => {
+          if (!userId) {
+            toast.error("Sign in to add a manual entry.");
+            return;
+          }
+          try {
+            await createManualTimeEntry(userId, {
+              taskId,
+              projectId,
+              type,
+              startedAt,
+              endedAt,
+            });
+            await refreshEntries();
+            toast.success("Manual entry added.");
+          } catch (err) {
+            toast.error("Failed to add entry", {
+              description: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }}
+      />
+    </section>
+  );
+}
