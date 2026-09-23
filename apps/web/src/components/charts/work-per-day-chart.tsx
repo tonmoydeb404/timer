@@ -15,6 +15,7 @@ import {
   type ChartConfig,
 } from "@packages/ui/components/chart";
 import { DataState } from "@packages/ui/components/data-state";
+import { Skeleton } from "@packages/ui/components/skeleton";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 const chartConfig = {
@@ -50,6 +51,7 @@ export function WorkPerDayChart({ data, loading, error, onRetry }: Props) {
           data={data}
           onRetry={onRetry}
           emptyTitle="No time tracked in this range"
+          loadingComponent={<Skeleton className="h-64 w-full" />}
         >
           {(rows) => (
             <ChartContainer config={chartConfig} className="h-64 w-full">
@@ -86,14 +88,14 @@ export function WorkPerDayChart({ data, loading, error, onRetry }: Props) {
                   stackId="a"
                   fill="var(--color-workMs)"
                   radius={[0, 0, 4, 4]}
-                  minPointSize={2}
+                  minPointSize={0}
                 />
                 <Bar
                   dataKey="breakMs"
                   stackId="a"
                   fill="var(--color-breakMs)"
                   radius={[4, 4, 0, 0]}
-                  minPointSize={2}
+                  minPointSize={0}
                 />
               </BarChart>
             </ChartContainer>

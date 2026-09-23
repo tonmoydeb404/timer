@@ -45,10 +45,12 @@ export function TimeDayGroup({
   const { user } = useAuth();
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [taskById, setTaskById] = useState<Record<string, Task | null>>({});
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const {
     run: reload,
-    isLoading: loading,
+    isLoading: isFetching,
     error,
   } = useAsyncAction(
     useCallback(async () => {
@@ -74,13 +76,18 @@ export function TimeDayGroup({
           uniqueTaskIds.map((id, i) => [id, tasks[i] ?? null]),
         ),
       );
+      setHasLoadedOnce(true);
     }, [user, day, typeFilter, taskFilter, projectFilter]),
   );
 
+  // Only the very first fetch should show the full skeleton — later refetches show a top bar loader.
+  const loading = isFetching && !hasLoadedOnce;
+
   useEffect(() => {
+    if (!isOpen) return;
     void reload();
     // Also refetch whenever the parent list signals a mutation happened.
-  }, [reload, refreshSignal]);
+  }, [isOpen, reload, refreshSignal]);
 
   let workMs = 0;
   let breakMs = 0;
@@ -105,6 +112,7 @@ export function TimeDayGroup({
   return (
     <AccordionItem
       value={day}
+      onOpenChange={setIsOpen}
       className="overflow-hidden rounded-lg border border-border bg-card"
     >
       <AccordionTrigger className="px-3 py-2.5 hover:no-underline aria-expanded:border-b aria-expanded:border-border">
@@ -127,6 +135,7 @@ export function TimeDayGroup({
           columns={columns}
           data={entries}
           loading={loading}
+          isFetching={isFetching}
           error={error}
           onRetry={() => void reload()}
           emptyTitle="No entries"

@@ -4,6 +4,7 @@ import { ProjectSelect } from "@/components/selectors/project-select";
 import { useProjects, useTasks } from "@/contexts/app/app-context";
 import type { Task } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
+import { Card, CardContent } from "@packages/ui/components/card";
 import { DataTable } from "@packages/ui/components/data-table";
 import { Input } from "@packages/ui/components/input";
 import { PaginationControl } from "@packages/ui/components/pagination-control";
@@ -39,6 +40,7 @@ export const TaskListSection = forwardRef<TaskListSectionHandle, object>(
       tasks,
       total,
       loading,
+      isFetching,
       error,
       search,
       setSearch,
@@ -126,19 +128,24 @@ export const TaskListSection = forwardRef<TaskListSectionHandle, object>(
           </div>
         </div>
 
-        <DataTable
-          columns={columns}
-          data={tasks}
-          loading={loading}
-          error={error}
-          onRetry={() => void reload()}
-          emptyTitle={total === 0 ? "No tasks yet" : "No matching tasks"}
-          emptyHint={
-            total === 0
-              ? "Create the first one to get started."
-              : "Try a different search or filter."
-          }
-        />
+        <Card>
+          <CardContent>
+            <DataTable
+              columns={columns}
+              data={tasks}
+              loading={loading}
+              isFetching={isFetching}
+              error={error}
+              onRetry={() => void reload()}
+              emptyTitle={total === 0 ? "No tasks yet" : "No matching tasks"}
+              emptyHint={
+                total === 0
+                  ? "Create the first one to get started."
+                  : "Try a different search or filter."
+              }
+            />
+          </CardContent>
+        </Card>
 
         <PaginationControl
           page={page}

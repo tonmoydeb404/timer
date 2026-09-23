@@ -40,7 +40,8 @@ export function useTimeStats() {
     [get, fallback],
   );
   const setRange = useCallback(
-    (next: { from?: string; to?: string }) => set({ from: next.from, to: next.to }),
+    (next: { from?: string; to?: string }) =>
+      set({ from: next.from, to: next.to }),
     [set],
   );
 
@@ -77,8 +78,9 @@ export function useTimeStats() {
   );
 
   useEffect(() => {
+    if (!user) return;
     void reload();
-  }, [reload]);
+  }, [user, reload]);
 
   return {
     range,

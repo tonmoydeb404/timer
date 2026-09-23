@@ -46,8 +46,9 @@ export function useDayTotals(
   );
 
   useEffect(() => {
+    if (!user) return;
     void reload();
-  }, [reload]);
+  }, [user, reload]);
 
   const data = useMemo(() => {
     const byDay = new Map(totals.map((d) => [d.day, d]));

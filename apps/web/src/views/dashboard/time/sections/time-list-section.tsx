@@ -114,7 +114,7 @@ export const TimeListSection = forwardRef<TimeListSectionHandle, Props>(
           }
         >
           {(dayKeys) => (
-            <Accordion key={page} defaultValue={dayKeys} className="grid gap-2">
+            <Accordion key={page} className="grid gap-2">
               {dayKeys.map((day) => (
                 <TimeDayGroup
                   key={day}

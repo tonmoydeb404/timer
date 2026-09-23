@@ -1,5 +1,10 @@
 import { useApp } from "@/context/app-context";
-import { createManualTimeEntry, getProfile, listTimeEntries } from "@/lib/db";
+import {
+  createManualTimeEntry,
+  getProfile,
+  listTimeEntries,
+  updateManualTimeEntry,
+} from "@/lib/db";
 import { useAsyncAction } from "@/lib/use-async-action";
 import type { EntryType, Profile, TimeEntry } from "@packages/domain/index";
 import { useCallback, useEffect, useState } from "react";
@@ -43,6 +48,18 @@ export function useTimeEntriesData() {
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
       : "UTC");
 
+  // Keeps the shared list newest-first so the Times screen + Home stats
+  // (both derived from `entries`) reflect a create/update immediately.
+  const upsert = useCallback((saved: TimeEntry) => {
+    setEntries((prev) => {
+      const exists = prev.some((e) => e.$id === saved.$id);
+      const next = exists
+        ? prev.map((e) => (e.$id === saved.$id ? saved : e))
+        : [saved, ...prev];
+      return next.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    });
+  }, []);
+
   const addManualEntry = useAsyncAction(
     async (input: {
       taskId: string | null;
@@ -53,8 +70,24 @@ export function useTimeEntriesData() {
     }) => {
       if (!userId) throw new Error("You're signed out.");
       const created = await createManualTimeEntry(userId, input);
-      setEntries((prev) => [created, ...prev]);
+      upsert(created);
       return created;
+    },
+  );
+
+  const updateEntry = useAsyncAction(
+    async (
+      entryId: string,
+      patch: Partial<
+        Pick<
+          TimeEntry,
+          "taskId" | "projectId" | "type" | "startedAt" | "endedAt"
+        >
+      >,
+    ) => {
+      const saved = await updateManualTimeEntry(entryId, patch);
+      upsert(saved);
+      return saved;
     },
   );
 
@@ -67,5 +100,7 @@ export function useTimeEntriesData() {
     reload,
     addManualEntry: addManualEntry.run,
     addingManualEntry: addManualEntry.isLoading,
+    updateEntry: updateEntry.run,
+    updatingEntry: updateEntry.isLoading,
   };
 }

@@ -21,6 +21,7 @@ export function useProjectsData() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [total, setTotal] = useState(0);
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
     const id = setTimeout(
@@ -36,7 +37,7 @@ export function useProjectsData() {
 
   const {
     run: reload,
-    isLoading: loading,
+    isLoading: isFetching,
     error,
   } = useAsyncAction(
     useCallback(async () => {
@@ -55,8 +56,12 @@ export function useProjectsData() {
       setTaskCounts(
         Object.fromEntries(rows.map((p, i) => [p.$id, counts[i] ?? 0])),
       );
+      setHasLoadedOnce(true);
     }, [user, statusFilter, debouncedSearch, page]),
   );
+
+  // Only the very first fetch should show the full skeleton — later refetches show a top bar loader.
+  const loading = isFetching && !hasLoadedOnce;
 
   useEffect(() => {
     void reload();
@@ -72,6 +77,7 @@ export function useProjectsData() {
       projects,
       total,
       loading,
+      isFetching,
       error,
       taskCounts,
       search,
@@ -87,6 +93,7 @@ export function useProjectsData() {
       projects,
       total,
       loading,
+      isFetching,
       error,
       taskCounts,
       search,

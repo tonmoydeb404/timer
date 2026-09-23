@@ -303,3 +303,28 @@ export async function createManualTimeEntry(
   )) as unknown as Doc;
   return toTimeEntry(doc);
 }
+
+/** Patches an existing (manual) time entry, e.g. a future "edit entry" sheet. */
+export async function updateManualTimeEntry(
+  entryId: string,
+  patch: Partial<
+    Pick<TimeEntry, "taskId" | "projectId" | "type" | "startedAt" | "endedAt">
+  >,
+): Promise<TimeEntry> {
+  const data: Record<string, unknown> = {};
+  if (patch.taskId !== undefined) data.taskId = patch.taskId;
+  if (patch.projectId !== undefined) {
+    if (!patch.projectId) throw new Error("A project is required.");
+    data.projectId = patch.projectId;
+  }
+  if (patch.type !== undefined) data.type = patch.type;
+  if (patch.startedAt !== undefined) data.startedAt = patch.startedAt;
+  if (patch.endedAt !== undefined) data.endedAt = patch.endedAt;
+  const doc = (await requireDatabases().updateDocument(
+    DB,
+    COLLECTIONS.timeEntries,
+    entryId,
+    data,
+  )) as unknown as Doc;
+  return toTimeEntry(doc);
+}

@@ -29,6 +29,7 @@ export const ProjectListSection = forwardRef<ProjectListSectionHandle, object>(
       projects,
       total,
       loading,
+      isFetching,
       error,
       taskCounts,
       search,
@@ -90,6 +91,7 @@ export const ProjectListSection = forwardRef<ProjectListSectionHandle, object>(
               columns={columns}
               data={projects}
               loading={loading}
+              isFetching={isFetching}
               error={error}
               onRetry={() => void reload()}
               emptyTitle={

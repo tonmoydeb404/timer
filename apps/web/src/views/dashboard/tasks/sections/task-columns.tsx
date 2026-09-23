@@ -1,6 +1,7 @@
 import type { Task } from "@packages/domain/index";
 import { Badge } from "@packages/ui/components/badge";
 import { Button } from "@packages/ui/components/button";
+import { Checkbox } from "@packages/ui/components/checkbox";
 import type { DataTableFeatures } from "@packages/ui/components/data-table";
 import {
   DropdownMenu,
@@ -9,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@packages/ui/components/dropdown-menu";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Check, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 const PRIORITY_STYLES: Record<string, string> = {
   HIGH: "bg-destructive/10 text-destructive border-destructive/20",
@@ -32,43 +33,28 @@ export function buildTaskColumns({
 }: TaskColumnsOptions): ColumnDef<DataTableFeatures, Task>[] {
   return [
     {
-      id: "done",
-      header: "",
+      accessorKey: "title",
+      header: "Title",
       cell: ({ row }) => {
         const task = row.original;
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={
-              task.status === "DONE" ? "Reopen task" : "Complete task"
-            }
-            onClick={() => onToggleDone(task)}
-            className={
-              task.status === "DONE"
-                ? "size-7 rounded-full border border-primary bg-primary text-primary-foreground"
-                : "size-7 rounded-full border"
-            }
-          >
-            {task.status === "DONE" && <Check size={14} />}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={task.status === "DONE"}
+              onCheckedChange={() => onToggleDone(task)}
+            />
+            <span
+              className={
+                row.original.status === "DONE"
+                  ? "text-muted-foreground line-through"
+                  : "font-medium"
+              }
+            >
+              {row.original.title}
+            </span>
+          </div>
         );
       },
-    },
-    {
-      accessorKey: "title",
-      header: "Title",
-      cell: ({ row }) => (
-        <span
-          className={
-            row.original.status === "DONE"
-              ? "text-muted-foreground line-through"
-              : "font-medium"
-          }
-        >
-          {row.original.title}
-        </span>
-      ),
     },
     {
       id: "project",
