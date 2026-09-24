@@ -246,36 +246,78 @@ export type PendingUpload = {
   type: "WORK" | "BREAK";
   started_at: string;
   ended_at: string;
+  remote_id: string | null;
 };
 
-/** Uploads closed timer segments as time entries. Returns uploaded local ids. */
+/** Creates the live (open-ended) record for a segment right as it starts, so
+ * other devices can see (and eventually control) the running timer. */
+export async function createOpenTimeEntry(
+  userId: string,
+  entry: {
+    task_id: string | null;
+    project_id: string | null;
+    type: EntryType;
+    started_at: string;
+  },
+): Promise<TimeEntry> {
+  const doc = (await requireDatabases().createDocument(
+    DB,
+    COLLECTIONS.timeEntries,
+    ID.unique(),
+    {
+      userId,
+      taskId: entry.task_id,
+      projectId: entry.project_id,
+      type: entry.type,
+      startedAt: entry.started_at,
+      endedAt: null,
+    },
+    ownerPermissions(userId),
+  )) as unknown as Doc;
+  return toTimeEntry(doc);
+}
+
+/** Uploads closed timer segments as time entries. Segments that already have
+ * a live doc (created at start via `createOpenTimeEntry`) are closed in
+ * place; others (e.g. created while offline) are created as closed entries.
+ * Returns uploaded local ids. */
 export async function uploadTimeEntries(
   userId: string,
   entries: PendingUpload[],
 ): Promise<string[]> {
   const uploaded: string[] = [];
   for (const entry of entries) {
-    await requireDatabases().createDocument(
-      DB,
-      COLLECTIONS.timeEntries,
-      ID.unique(),
-      {
-        userId,
-        taskId: entry.task_id,
-        projectId: entry.project_id,
-        type: entry.type,
-        startedAt: entry.started_at,
-        endedAt: entry.ended_at,
-      },
-      ownerPermissions(userId),
-    );
+    if (entry.remote_id) {
+      await requireDatabases().updateDocument(
+        DB,
+        COLLECTIONS.timeEntries,
+        entry.remote_id,
+        { endedAt: entry.ended_at },
+      );
+    } else {
+      await requireDatabases().createDocument(
+        DB,
+        COLLECTIONS.timeEntries,
+        ID.unique(),
+        {
+          userId,
+          taskId: entry.task_id,
+          projectId: entry.project_id,
+          type: entry.type,
+          startedAt: entry.started_at,
+          endedAt: entry.ended_at,
+        },
+        ownerPermissions(userId),
+      );
+    }
     uploaded.push(entry.local_id);
   }
   return uploaded;
 }
 
-/** Creates a manual (already-closed) time entry, e.g. from the desktop
- * "Add manual entry" sheet. Project is required; task is optional. */
+/** Creates a manual time entry, e.g. from the desktop "Add manual entry"
+ * sheet. Project is required; task and end time are optional (an entry
+ * without an end time is "open", same as a running timer). */
 export async function createManualTimeEntry(
   userId: string,
   input: {
@@ -283,7 +325,7 @@ export async function createManualTimeEntry(
     projectId: string | null;
     type: EntryType;
     startedAt: string;
-    endedAt: string;
+    endedAt: string | null;
   },
 ): Promise<TimeEntry> {
   if (!input.projectId) throw new Error("A project is required.");

@@ -107,6 +107,28 @@ pub async fn stop_timer(app: AppHandle) -> Result<crate::timer::TimerView, Strin
     mutate_timer(&app, crate::timer::stop).await
 }
 
+/// Attaches the Appwrite doc id the frontend just created for the
+/// currently open segment, so cross-device clients can see (and later
+/// control) the running timer, and so closing the segment updates that
+/// doc in place instead of creating a duplicate.
+#[tauri::command]
+pub async fn attach_open_segment_remote_id(
+    app: AppHandle,
+    remote_id: String,
+) -> Result<crate::timer::TimerView, String> {
+    let state = app.state::<AppState>();
+    let _guard = state.timer_lock.lock().await;
+
+    let mut store = crate::timer::load(&state.app_data_dir);
+    crate::timer::attach_open_segment_remote_id(&mut store, &remote_id);
+    crate::timer::save(&state.app_data_dir, &store).map_err(map_err)?;
+
+    let view = crate::timer::view(&store, crate::timer::now_ms());
+    let _ = app.emit("tymar://changed", &view);
+    crate::tray::rebuild_menu(&app);
+    Ok(view)
+}
+
 #[tauri::command]
 pub async fn switch_task(
     app: AppHandle,

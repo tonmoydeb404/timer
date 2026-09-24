@@ -9,7 +9,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { api, onTimerChanged } from "../lib/api";
-import { uploadTimeEntries } from "../lib/db";
+import { createOpenTimeEntry, uploadTimeEntries } from "../lib/db";
 import type { TimerView } from "../types";
 import { useApp } from "./app-context";
 
@@ -48,6 +48,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
   const mounted = useRef(true);
   const uploading = useRef<Set<string>>(new Set());
+  const creatingRemote = useRef<Set<number>>(new Set());
   const userId = auth?.user?.id ?? null;
 
   useEffect(() => {
@@ -78,6 +79,31 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       unlisten.then((fn) => fn());
     };
   }, [refresh, apply]);
+
+  // Create the live (open-ended) record for the currently open segment as
+  // soon as it appears — this is what lets other devices see/control a
+  // running timer instead of only finding out once it's stopped.
+  useEffect(() => {
+    const open = view?.segments.find((s) => s.ended_at_ms === null);
+    if (!userId || !open || open.remote_id) return;
+    if (creatingRemote.current.has(open.started_at_ms)) return;
+    creatingRemote.current.add(open.started_at_ms);
+    (async () => {
+      try {
+        const doc = await createOpenTimeEntry(userId, {
+          task_id: view?.task_id ?? null,
+          project_id: view?.project_id ?? null,
+          type: open.type,
+          started_at: new Date(open.started_at_ms).toISOString(),
+        });
+        apply(await api.attachOpenSegmentRemoteId(doc.$id));
+      } catch {
+        // Stays unattached; retried on the next view change (e.g. tick).
+      } finally {
+        creatingRemote.current.delete(open.started_at_ms);
+      }
+    })();
+  }, [view, userId, apply]);
 
   // Upload closed segments via the Appwrite SDK, then ack them in Rust.
   // Runs on every view change (actions, tray, boot) — the footer surfaces

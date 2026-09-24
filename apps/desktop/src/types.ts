@@ -35,6 +35,8 @@ export type SegmentView = {
   started_at_ms: number;
   ended_at_ms: number | null;
   duration_ms: number;
+  /** Appwrite `time_entries` doc id, once the frontend creates the live record. */
+  remote_id: string | null;
 };
 
 export type PendingEntry = {
@@ -45,6 +47,8 @@ export type PendingEntry = {
   started_at: string;
   ended_at: string;
   attempts: number;
+  /** Set if a live doc already exists for this segment — update instead of create. */
+  remote_id: string | null;
 };
 
 export type TimerView = {
