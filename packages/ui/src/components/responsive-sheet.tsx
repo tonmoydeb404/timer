@@ -4,6 +4,14 @@ import { DrawerDescriptionProps } from "@base-ui/react";
 import * as React from "react";
 import { useIsMobile } from "../hooks/use-mobile";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./dialog";
+import {
   Drawer,
   DrawerContent,
   DrawerDescription,
@@ -27,16 +35,20 @@ type ResponsiveSheetProps = {
   description?: React.ReactNode;
   descriptionProps?: DrawerDescriptionProps;
 
-  /** Sheet side on desktop. Ignored on mobile (bottom drawer). */
+  /** Sheet side on desktop. Ignored on mobile (bottom drawer) or "dialog" variant. */
   side?: "right" | "left" | "top" | "bottom";
+  /** Desktop chrome: a side Sheet, or a centered Dialog for short forms. Ignored on mobile. */
+  variant?: "sheet" | "dialog";
+  /** Dialog width when `variant="dialog"`. Ignored otherwise. */
+  size?: "sm" | "default" | "lg";
   footer?: React.ReactNode;
   children: React.ReactNode;
 };
 
 /**
- * Form container that renders a side Sheet on desktop and a bottom Drawer
- * on mobile (and other narrow viewports, e.g. a 420px desktop window).
- * Same props, adaptive chrome.
+ * Form container that renders a side Sheet (or centered Dialog) on desktop
+ * and a bottom Drawer on mobile (and other narrow viewports, e.g. a 420px
+ * desktop window). Same props, adaptive chrome.
  */
 export function ResponsiveSheet({
   open,
@@ -45,6 +57,8 @@ export function ResponsiveSheet({
   description,
   descriptionProps,
   side = "right",
+  variant = "sheet",
+  size,
   footer,
   children,
 }: ResponsiveSheetProps) {
@@ -66,6 +80,25 @@ export function ResponsiveSheet({
           {footer && <DrawerFooter className="mt-5">{footer}</DrawerFooter>}
         </DrawerContent>
       </Drawer>
+    );
+  }
+
+  if (variant === "dialog") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent size={size}>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            {description && (
+              <DialogDescription {...descriptionProps}>
+                {description}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="grid gap-3 px-4">{children}</div>
+          {footer && <DialogFooter>{footer}</DialogFooter>}
+        </DialogContent>
+      </Dialog>
     );
   }
 
