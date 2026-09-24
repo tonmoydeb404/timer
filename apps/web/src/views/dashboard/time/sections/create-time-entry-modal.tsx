@@ -3,6 +3,7 @@
 import { TaskSelect } from "@/components/selectors/task-select";
 import { useTimeEntries } from "@/contexts/app/app-context";
 import type { EntryType } from "@packages/domain/index";
+import { findOverlap } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { Label } from "@packages/ui/components/label";
@@ -26,7 +27,7 @@ type Props = {
 };
 
 export function CreateTimeEntryModal({ open, onOpenChange, onCreated }: Props) {
-  const { create } = useTimeEntries();
+  const { create, timeEntries } = useTimeEntries();
   const [taskId, setTaskId] = useState("");
   const [type, setType] = useState<EntryType>("WORK");
   const [start, setStart] = useState("");
@@ -55,12 +56,25 @@ export function CreateTimeEntryModal({ open, onOpenChange, onCreated }: Props) {
       return;
     }
     const endedAt = localInputToIso(end);
-    if (!endedAt) {
-      setValidationError("End time is required — open entries can't sync yet.");
+    if (end && !endedAt) {
+      setValidationError("End time is invalid.");
       return;
     }
-    if (new Date(endedAt).getTime() <= new Date(startedAt).getTime()) {
+    if (
+      endedAt &&
+      new Date(endedAt).getTime() <= new Date(startedAt).getTime()
+    ) {
       setValidationError("End must be after start.");
+      return;
+    }
+    if (!endedAt && timeEntries.some((e) => e.endedAt === null)) {
+      setValidationError(
+        "An entry is already running — stop it before adding another open entry.",
+      );
+      return;
+    }
+    if (findOverlap({ startedAt, endedAt }, timeEntries)) {
+      setValidationError("This overlaps another entry.");
       return;
     }
     setValidationError(null);
@@ -77,8 +91,9 @@ export function CreateTimeEntryModal({ open, onOpenChange, onCreated }: Props) {
     <ResponsiveSheet
       open={open}
       onOpenChange={onOpenChange}
+      variant="dialog"
       title="Log time"
-      description="Timestamps are edited — duration is always derived from them."
+      description="Timestamps are edited — duration is always derived from them. Leave end blank to log an open (still running) entry."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -120,7 +135,7 @@ export function CreateTimeEntryModal({ open, onOpenChange, onCreated }: Props) {
           />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="entry-end">End</Label>
+          <Label htmlFor="entry-end">End (optional)</Label>
           <Input
             id="entry-end"
             type="datetime-local"

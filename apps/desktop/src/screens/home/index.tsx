@@ -6,21 +6,22 @@ import { useTimer } from "@/context/timer-context";
 import { onOpenSwitcher } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
-  aggregateDayTotals,
-  currentWeekBounds,
-  formatDuration,
-  formatDurationShort,
+    aggregateDayTotals,
+    currentWeekBounds,
+    formatDuration,
+    formatDurationShort,
+    type TimeInterval,
 } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import {
-  ArrowLeftRight,
-  CalendarDays,
-  Clock,
-  Coffee,
-  NotebookPen,
-  Pause,
-  Play,
-  Plus,
+    ArrowLeftRight,
+    CalendarDays,
+    Clock,
+    Coffee,
+    NotebookPen,
+    Pause,
+    Play,
+    Plus,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -47,6 +48,22 @@ export function HomeScreen() {
   const running = status !== "IDLE";
   const toggleOn = status !== "IDLE";
   const onBreak = status === "BREAK";
+
+  // Existing entries + the running timer (if any) — the manual entry sheet
+  // rejects anything that would overlap one of these.
+  const conflicts = useMemo<TimeInterval[]>(() => {
+    const list: TimeInterval[] = entries.map((e) => ({
+      startedAt: e.startedAt,
+      endedAt: e.endedAt,
+    }));
+    if (view?.started_at_ms) {
+      list.push({
+        startedAt: new Date(view.started_at_ms).toISOString(),
+        endedAt: null,
+      });
+    }
+    return list;
+  }, [entries, view?.started_at_ms]);
 
   useEffect(() => {
     if (!running) return;
@@ -314,6 +331,7 @@ export function HomeScreen() {
         onOpenChange={setManualOpen}
         busy={false}
         onQuickAdd={handleQuickAdd}
+        conflicts={conflicts}
         onSubmit={async ({ projectId, taskId, type, startedAt, endedAt }) => {
           if (!userId) {
             toast.error("Sign in to add a manual entry.");
