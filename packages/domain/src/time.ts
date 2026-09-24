@@ -158,6 +158,30 @@ export function currentWeekBounds(
 
 export type DaySlice = { day: string; durationMs: number };
 
+/** An interval used for overlap checks; `endedAt` is null while still open. */
+export type TimeInterval = { startedAt: string; endedAt: string | null };
+
+/**
+ * True if two entries occupy overlapping time. An open entry (`endedAt`
+ * null, e.g. a running timer) is treated as ongoing — it conflicts with
+ * anything starting after it began.
+ */
+export function intervalsOverlap(a: TimeInterval, b: TimeInterval): boolean {
+  const aStart = toEpochMs(a.startedAt);
+  const bStart = toEpochMs(b.startedAt);
+  const aEnd = a.endedAt ? toEpochMs(a.endedAt) : Infinity;
+  const bEnd = b.endedAt ? toEpochMs(b.endedAt) : Infinity;
+  return aStart < bEnd && bStart < aEnd;
+}
+
+/** First existing interval (if any) that conflicts with `candidate`. */
+export function findOverlap<T extends TimeInterval>(
+  candidate: TimeInterval,
+  existing: T[],
+): T | undefined {
+  return existing.find((entry) => intervalsOverlap(candidate, entry));
+}
+
 /**
  * Split an entry across calendar days in the user's timezone so a session
  * crossing midnight attributes hours to the correct days (PRD §25).

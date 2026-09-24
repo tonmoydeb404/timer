@@ -1,9 +1,9 @@
 import { useApp } from "@/context/app-context";
 import {
-  createManualTimeEntry,
-  getProfile,
-  listTimeEntries,
-  updateManualTimeEntry,
+    createManualTimeEntry,
+    getProfile,
+    listTimeEntries,
+    updateManualTimeEntry,
 } from "@/lib/db";
 import { useAsyncAction } from "@/lib/use-async-action";
 import type { EntryType, Profile, TimeEntry } from "@packages/domain/index";
@@ -66,7 +66,7 @@ export function useTimeEntriesData() {
       projectId: string | null;
       type: EntryType;
       startedAt: string;
-      endedAt: string;
+      endedAt: string | null;
     }) => {
       if (!userId) throw new Error("You're signed out.");
       const created = await createManualTimeEntry(userId, input);

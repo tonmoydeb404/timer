@@ -2,12 +2,14 @@ import { ManualEntrySheet } from "@/components/manual-entry-sheet";
 import { ScreenHeader } from "@/components/screen-header";
 import { useApp } from "@/context/app-context";
 import { useProjects, useTasks, useTimeEntries } from "@/context/db/db-context";
+import { useTimer } from "@/context/timer-context";
 import {
-  currentWeekBounds,
-  entryDurationMs,
-  formatDuration,
-  formatDurationShort,
-  groupEntriesByStartDay,
+    currentWeekBounds,
+    entryDurationMs,
+    formatDuration,
+    formatDurationShort,
+    groupEntriesByStartDay,
+    type TimeInterval,
 } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import { DataState } from "@packages/ui/components/data-state";
@@ -59,6 +61,7 @@ export function TimesScreen() {
   const { entries, timeZone, loading, error, reload, addManualEntry } =
     useTimeEntries();
   const [manualOpen, setManualOpen] = useState(false);
+  const { view } = useTimer();
 
   const userId = auth?.user?.id ?? null;
   const taskById = useMemo(
@@ -69,6 +72,22 @@ export function TimesScreen() {
     () => new Map(projects.map((p) => [p.$id, p])),
     [projects],
   );
+
+  // Existing entries + the running timer (if any) — the manual entry sheet
+  // rejects anything that would overlap one of these.
+  const conflicts = useMemo<TimeInterval[]>(() => {
+    const list: TimeInterval[] = entries.map((e) => ({
+      startedAt: e.startedAt,
+      endedAt: e.endedAt,
+    }));
+    if (view?.started_at_ms) {
+      list.push({
+        startedAt: new Date(view.started_at_ms).toISOString(),
+        endedAt: null,
+      });
+    }
+    return list;
+  }, [entries, view?.started_at_ms]);
 
   const weekEntries = useMemo(() => {
     const { startMs, endMs } = currentWeekBounds(timeZone);
@@ -209,6 +228,7 @@ export function TimesScreen() {
         onOpenChange={setManualOpen}
         busy={false}
         onQuickAdd={handleQuickAdd}
+        conflicts={conflicts}
         onSubmit={async ({ projectId, taskId, type, startedAt, endedAt }) => {
           if (!userId) {
             toast.error("Sign in to add a manual entry.");

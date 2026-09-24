@@ -34,6 +34,10 @@ pub struct Segment {
     pub kind: SegmentType,
     pub started_at_ms: i64,
     pub ended_at_ms: Option<i64>,
+    /// Appwrite `time_entries` doc id, attached once the frontend creates
+    /// the live (open-ended) record for this segment. None until then.
+    #[serde(default)]
+    pub remote_id: Option<String>,
 }
 
 impl Segment {
@@ -68,6 +72,10 @@ pub struct PendingEntry {
     pub started_at: String,
     pub ended_at: String,
     pub attempts: u32,
+    /// If set, the live doc already exists in Appwrite (created at start) —
+    /// the frontend should update it instead of creating a new one.
+    #[serde(default)]
+    pub remote_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -170,9 +178,28 @@ pub fn start(
             kind: SegmentType::Work,
             started_at_ms: at_ms,
             ended_at_ms: None,
+            remote_id: None,
         }],
     });
     Ok(())
+}
+
+/// Attaches the Appwrite doc id for the currently open segment (set right
+/// after the frontend creates the live record). No-op if there is no open
+/// segment or it is already attached.
+pub fn attach_open_segment_remote_id(store: &mut TimerStore, remote_id: &str) {
+    if let Some(active) = store.active.as_mut() {
+        if let Some(open) = active
+            .segments
+            .iter_mut()
+            .rev()
+            .find(|s| s.ended_at_ms.is_none())
+        {
+            if open.remote_id.is_none() {
+                open.remote_id = Some(remote_id.to_string());
+            }
+        }
+    }
 }
 
 pub fn take_break(store: &mut TimerStore, at_ms: i64) -> Result<(), TransitionError> {
@@ -186,6 +213,7 @@ pub fn take_break(store: &mut TimerStore, at_ms: i64) -> Result<(), TransitionEr
         kind: SegmentType::Break,
         started_at_ms: at_ms,
         ended_at_ms: None,
+        remote_id: None,
     });
     Ok(())
 }
@@ -201,6 +229,7 @@ pub fn resume(store: &mut TimerStore, at_ms: i64) -> Result<(), TransitionError>
         kind: SegmentType::Work,
         started_at_ms: at_ms,
         ended_at_ms: None,
+        remote_id: None,
     });
     Ok(())
 }
@@ -246,6 +275,7 @@ fn segments_to_entries(store: &mut TimerStore, active: &ActiveTimer) -> Vec<Pend
                 started_at: to_iso(s.started_at_ms),
                 ended_at: to_iso(ended),
                 attempts: 0,
+                remote_id: s.remote_id.clone(),
             })
         })
         .collect()
@@ -260,6 +290,7 @@ pub struct SegmentView {
     pub started_at_ms: i64,
     pub ended_at_ms: Option<i64>,
     pub duration_ms: i64,
+    pub remote_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -306,6 +337,7 @@ pub fn view(store: &TimerStore, at_ms: i64) -> TimerView {
             started_at_ms: s.started_at_ms,
             ended_at_ms: s.ended_at_ms,
             duration_ms: s.duration_ms(at_ms),
+            remote_id: s.remote_id.clone(),
         })
         .collect();
     let work_ms: i64 = segments

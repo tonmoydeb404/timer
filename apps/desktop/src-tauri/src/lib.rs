@@ -157,6 +157,7 @@ pub fn run() {
             commands::resume_timer,
             commands::stop_timer,
             commands::switch_task,
+            commands::attach_open_segment_remote_id,
             commands::get_settings,
             commands::set_setting,
             commands::enable_autostart,

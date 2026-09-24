@@ -1,15 +1,16 @@
 import { SessionFields } from "@/components/session-fields";
-import type { EntryType, Task } from "@packages/domain/index";
+import type { EntryType, Task, TimeInterval } from "@packages/domain/index";
+import { findOverlap } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { Label } from "@packages/ui/components/label";
 import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@packages/ui/components/select";
 import { useEffect, useState } from "react";
 
@@ -20,23 +21,26 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   busy: boolean;
   onQuickAdd: (projectId: string, title: string) => Promise<Task>;
+  /** Existing entries + the running timer (if any), used to reject overlaps. */
+  conflicts: TimeInterval[];
   onSubmit: (input: {
     projectId: string | null;
     taskId: string | null;
     type: EntryType;
     startedAt: string;
-    endedAt: string;
+    endedAt: string | null;
   }) => Promise<void>;
 };
 
-// Manual "add time entry" sheet — project is required, task is optional,
-// timestamps
-// are edited directly (same rule as the web dashboard's log-time modal).
+// Manual "add time entry" sheet — project is required, task and end time
+// are optional (an entry left open behaves like a running timer). Rejects
+// entries that would overlap the running timer or another existing entry.
 export function ManualEntrySheet({
   open,
   onOpenChange,
   busy,
   onQuickAdd,
+  conflicts,
   onSubmit,
 }: Props) {
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -61,9 +65,16 @@ export function ManualEntrySheet({
     const startedAt = start ? new Date(start).toISOString() : null;
     const endedAt = end ? new Date(end).toISOString() : null;
     if (!startedAt) return setError("Start time is invalid.");
-    if (!endedAt) return setError("End time is required.");
-    if (new Date(endedAt).getTime() <= new Date(startedAt).getTime()) {
+    if (endedAt && new Date(endedAt).getTime() <= new Date(startedAt).getTime()) {
       return setError("End must be after start.");
+    }
+    if (!endedAt && conflicts.some((c) => c.endedAt === null)) {
+      return setError(
+        "A timer or entry is already running — stop it before adding another open entry.",
+      );
+    }
+    if (findOverlap({ startedAt, endedAt }, conflicts)) {
+      return setError("This overlaps the running timer or another entry.");
     }
     setError(null);
     await onSubmit({ projectId, taskId, type, startedAt, endedAt });
@@ -75,7 +86,7 @@ export function ManualEntrySheet({
       open={open}
       onOpenChange={onOpenChange}
       title="Add manual entry"
-      description="A project is required — task is optional. Timestamps use your local time; duration is derived from them."
+      description="A project is required — task and end time are optional. Leave end blank to add an open (still running) entry."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -122,7 +133,7 @@ export function ManualEntrySheet({
           />
         </div>
         <div className="grid gap-1.5">
-          <Label htmlFor="manual-entry-end">End</Label>
+          <Label htmlFor="manual-entry-end">End (optional)</Label>
           <Input
             id="manual-entry-end"
             type="datetime-local"
@@ -135,3 +146,4 @@ export function ManualEntrySheet({
     </ResponsiveSheet>
   );
 }
+

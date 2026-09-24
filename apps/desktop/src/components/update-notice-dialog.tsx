@@ -1,12 +1,6 @@
 import { brand } from "@/lib/brand";
 import { Button } from "@packages/ui/components/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@packages/ui/components/dialog";
+import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import { CheckCircle2 } from "lucide-react";
 
 type UpdateNoticeDialogProps = {
@@ -25,33 +19,32 @@ export function UpdateNoticeDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent size="lg">
-        <DialogHeader className="flex-row items-center gap-3">
+    <ResponsiveSheet
+      open={open}
+      onOpenChange={handleOpenChange}
+      variant="dialog"
+      size="lg"
+      title={
+        <div className="flex items-center gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-500/15 text-emerald-500">
             <CheckCircle2 size={18} />
           </span>
-          <span className="grid gap-0.5">
-            <DialogTitle>{brand.appName} is up to date</DialogTitle>
-            <DialogDescription>
+          <span className="grid gap-0.5 text-left">
+            <span>{brand.appName} is up to date</span>
+            <span className="text-sm font-normal text-muted-foreground">
               {previousVersion
                 ? `Updated from v${previousVersion} to v${brand.version}.`
                 : `You're now on v${brand.version}.`}
-            </DialogDescription>
+            </span>
           </span>
-        </DialogHeader>
-
-        <div className="p-4 pt-0">
-          <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
-            Thanks for keeping {brand.appName} fresh. This version includes the
-            latest improvements and fixes.
-          </p>
         </div>
-
-        <div className="flex justify-end border-t border-border p-4">
-          <Button onClick={onDismiss}>Got it</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      }
+      footer={<Button onClick={onDismiss}>Got it</Button>}
+    >
+      <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
+        Thanks for keeping {brand.appName} fresh. This version includes the
+        latest improvements and fixes.
+      </p>
+    </ResponsiveSheet>
   );
 }

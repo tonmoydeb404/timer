@@ -37,6 +37,9 @@ export const api = {
       projectId,
       projectTitle,
     }),
+  /** Attaches the just-created Appwrite doc id to the currently open segment. */
+  attachOpenSegmentRemoteId: (remoteId: string) =>
+    invoke<TimerView>("attach_open_segment_remote_id", { remoteId }),
 
   getSettings: () => invoke<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>
