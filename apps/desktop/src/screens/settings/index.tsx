@@ -1,12 +1,14 @@
 import { ScreenHeader } from "@/components/screen-header";
+import { UpdateChangelogDialog } from "@/components/update-changelog-dialog";
 import { useApp } from "@/context/app-context";
 import { api } from "@/lib/api";
 import { brand } from "@/lib/brand";
 import { displayName } from "@/lib/display-name";
+import type { UpdateInfo } from "@/types";
 import { Button } from "@packages/ui/components/button";
 import { Switch } from "@packages/ui/components/switch";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ExternalLink, LogIn, LogOut, Moon, Rocket } from "lucide-react";
+import { ExternalLink, LogIn, LogOut, Moon, RefreshCw, Rocket } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -66,9 +68,13 @@ function Row({
 // Settings tab: appearance, system, account, about. Mirrors the desktop
 // settings dialog content inline for the popup layout.
 export function SettingsScreen() {
-  const { auth, signIn, signOut, signingIn } = useApp();
+  const { auth, signIn, signOut, signingIn, installUpdate, isInstallingUpdate } =
+    useApp();
   const { theme, setTheme } = useTheme();
   const [autostart, setAutostart] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
+  const [changelogOpen, setChangelogOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -76,6 +82,27 @@ export function SettingsScreen() {
       .then(setAutostart)
       .catch(() => {});
   }, []);
+
+  // Manual updater check (the boot check is automatic); an update opens
+  // the responsive changelog dialog, otherwise we toast "up to date".
+  async function handleCheckForUpdate() {
+    setCheckingUpdate(true);
+    try {
+      const info = await api.checkForUpdate();
+      if (info) {
+        setPendingUpdate(info);
+        setChangelogOpen(true);
+      } else {
+        toast.success(`${displayName} is up to date.`);
+      }
+    } catch (err) {
+      toast.error("Couldn't check for updates.", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }
 
   async function handleAutostartToggle(checked: boolean) {
     setAutostart(checked);
@@ -181,6 +208,19 @@ export function SettingsScreen() {
           </span>
           <span>{brand.description.short}</span>
           <Button
+            variant="outline"
+            size="sm"
+            className="mt-1 w-fit"
+            onClick={handleCheckForUpdate}
+            disabled={checkingUpdate || isInstallingUpdate}
+          >
+            <RefreshCw
+              size={12}
+              className={checkingUpdate ? "animate-spin" : undefined}
+            />
+            {checkingUpdate ? "Checking…" : "Check for updates"}
+          </Button>
+          <Button
             variant="ghost"
             size="sm"
             className="h-auto w-fit p-0 text-[11px] text-primary underline-offset-2 hover:underline"
@@ -191,6 +231,16 @@ export function SettingsScreen() {
           </Button>
         </div>
       </Section>
+
+      {pendingUpdate && (
+        <UpdateChangelogDialog
+          open={changelogOpen}
+          onOpenChange={setChangelogOpen}
+          updateInfo={pendingUpdate}
+          installing={isInstallingUpdate}
+          onInstall={() => void installUpdate()}
+        />
+      )}
     </section>
   );
 }

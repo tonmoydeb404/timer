@@ -1,7 +1,6 @@
 use tauri::{image::Image, menu::MenuEvent, tray::TrayIconBuilder, Emitter, Manager};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_updater::UpdaterExt;
 
 mod brand;
 mod commands;
@@ -28,30 +27,11 @@ pub fn show_window(app: &tauri::AppHandle) {
     }
 }
 
-// checks for a newer build and notifies the frontend; the user decides whether
-// to install via the "Install & restart" button in the sidebar.
+// checks for a newer build at boot and notifies the frontend; the same
+// check runs on demand via the `check_for_update` command (settings).
 async fn check_for_update(app: tauri::AppHandle) {
-    let updater = match app.updater() {
-        Ok(updater) => updater,
-        Err(err) => {
-            eprintln!("updater unavailable: {err}");
-            return;
-        }
-    };
-
-    match updater.check().await {
-        Ok(Some(update)) => {
-            let _ = app.emit(
-                "update://available",
-                serde_json::json!({
-                    "version": update.version,
-                    "body": update.body,
-                    "date": update.date.map(|d| d.to_string()),
-                }),
-            );
-        }
-        Ok(None) => {}
-        Err(err) => eprintln!("update check failed: {err}"),
+    if let Err(err) = commands::run_update_check(&app).await {
+        eprintln!("update check failed: {err}");
     }
 }
 
@@ -156,6 +136,7 @@ pub fn run() {
             commands::disable_autostart,
             commands::is_autostart_enabled,
             commands::install_update,
+            commands::check_for_update,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

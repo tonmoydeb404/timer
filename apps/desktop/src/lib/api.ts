@@ -31,6 +31,8 @@ export const api = {
   isAutostartEnabled: () => invoke<boolean>("is_autostart_enabled"),
 
   installUpdate: () => invoke<void>("install_update"),
+  /** Manual updater check (settings) — null when up to date. */
+  checkForUpdate: () => invoke<UpdateInfo | null>("check_for_update"),
 };
 
 // Backend → frontend events (emitted from Rust with app.emit(...)).
