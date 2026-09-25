@@ -1,10 +1,12 @@
 use tauri::{image::Image, menu::MenuEvent, tray::TrayIconBuilder, Emitter, Manager};
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(target_os = "windows")]
 use tauri_plugin_deep_link::DeepLinkExt;
 
 mod brand;
 mod commands;
 mod db;
+#[cfg(target_os = "linux")]
+mod deep_link;
 mod env;
 mod migrations;
 mod state;
@@ -62,13 +64,16 @@ pub fn run() {
         }))
         .setup(|app| {
             // Register the configured deep-link scheme where the OS needs runtime
-            // registration (Windows registry / Linux desktop entry).
+            // registration. Linux packaged builds use the bundled desktop entry;
+            // Linux dev/AppImage builds register their own handler files.
             // macOS registers schemes via the bundled Info.plist, and the
             // plugin reports UnsupportedPlatform there — never fatal.
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            #[cfg(target_os = "windows")]
             if let Err(e) = app.deep_link().register_all() {
                 eprintln!("deep-link registration failed: {e}");
             }
+            #[cfg(target_os = "linux")]
+            crate::deep_link::register_at_startup(app);
 
             // autostart launches with --hidden: stay in the tray without a
             // window; a normal launch shows the main window immediately
