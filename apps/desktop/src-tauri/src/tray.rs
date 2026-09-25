@@ -12,7 +12,7 @@ use tauri::{
     AppHandle, Emitter, Manager,
 };
 
-use crate::brand;
+use crate::env;
 
 /// Mirrored timer state pushed from the frontend.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -65,7 +65,7 @@ pub fn rebuild_menu(app: &AppHandle) {
             menu,
             app,
             "status",
-            &format!("{} — Idle", brand::APP_NAME),
+            &format!("{} — Idle", env::display_name()),
             false
         );
         separator!(menu, app);
@@ -114,21 +114,21 @@ pub fn rebuild_menu(app: &AppHandle) {
         menu,
         app,
         "open",
-        &format!("Open {}", brand::APP_NAME),
+        &format!("Open {}", env::display_name()),
         true
     );
     item!(
         menu,
         app,
         "quit",
-        &format!("Quit {}", brand::APP_NAME),
+        &format!("Quit {}", env::display_name()),
         true
     );
 
     if let Some(tray) = app.tray_by_id("main_tray") {
         let _ = tray.set_menu(Some(menu));
         if !tray_state.running {
-            let _ = tray.set_tooltip(Some(brand::APP_NAME));
+            let _ = tray.set_tooltip(Some(env::display_name()));
         }
     }
 }

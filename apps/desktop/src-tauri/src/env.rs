@@ -1,0 +1,20 @@
+//! Environment-dependent naming: dev builds get a `Dev` postfix so a
+//! `tauri dev` instance is never confused with the installed production
+//! app. Brand values themselves stay in `brand.json` (generated files
+//! untouched) — this only composes the runtime display name.
+
+/// True for debug builds (`pnpm dev:desktop` / `tauri dev`); false for
+/// release bundles.
+pub fn is_dev() -> bool {
+    cfg!(debug_assertions)
+}
+
+/// App display name with the dev postfix applied — "Tymar Dev" in dev,
+/// "Tymar" in production. Used for the window title and tray.
+pub fn display_name() -> String {
+    if is_dev() {
+        format!("{} Dev", crate::brand::APP_NAME)
+    } else {
+        crate::brand::APP_NAME.to_string()
+    }
+}

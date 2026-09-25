@@ -6,6 +6,7 @@ use tauri_plugin_updater::UpdaterExt;
 mod brand;
 mod commands;
 mod db;
+mod env;
 mod migrations;
 mod state;
 mod timer;
@@ -114,6 +115,12 @@ pub fn run() {
             let conn = db::open_connection(&app_data_dir).expect("failed to open database");
 
             app.manage(AppState::new(conn, app_data_dir));
+
+            // Dev builds carry a `Dev` postfix in the title (the tray uses
+            // the same name) so they read apart from the installed app.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&env::display_name());
+            }
 
             let updater_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

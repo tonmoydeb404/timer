@@ -2,6 +2,7 @@ import { ScreenHeader } from "@/components/screen-header";
 import { useApp } from "@/context/app-context";
 import { api } from "@/lib/api";
 import { brand } from "@/lib/brand";
+import { displayName } from "@/lib/display-name";
 import { Button } from "@packages/ui/components/button";
 import { Switch } from "@packages/ui/components/switch";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -81,7 +82,7 @@ export function SettingsScreen() {
     try {
       if (checked) {
         await api.enableAutostart();
-        toast.success(`${brand.appName} will launch on system boot.`);
+        toast.success(`${displayName} will launch on system boot.`);
       } else {
         await api.disableAutostart();
         toast.success("Autostart disabled.");
@@ -176,13 +177,13 @@ export function SettingsScreen() {
       <Section title="About">
         <div className="grid gap-1 rounded-xl border border-border bg-card p-3 text-[11px] text-muted-foreground">
           <span className="text-xs font-semibold text-ink">
-            {brand.appName} <span className="text-faint">v{brand.version}</span>
+            {displayName} <span className="text-faint">v{brand.version}</span>
           </span>
           <span>{brand.description.short}</span>
           <Button
             variant="ghost"
             size="sm"
-            className="mt-1 h-auto w-fit p-0 text-[11px] text-primary underline-offset-2 hover:underline"
+            className="h-auto w-fit p-0 text-[11px] text-primary underline-offset-2 hover:underline"
             onClick={() => openUrl(brand.repository).catch(() => {})}
           >
             <ExternalLink size={12} />

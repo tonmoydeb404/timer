@@ -1,4 +1,5 @@
 import { brand } from "@/lib/brand";
+import { displayName } from "@/lib/display-name";
 import { Button } from "@packages/ui/components/button";
 import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 
@@ -14,10 +15,10 @@ export function WelcomeDialog({ open, onGetStarted }: WelcomeDialogProps) {
       onOpenChange={() => {}}
       title={
         <div className="flex items-center gap-3">
-          <img src="/logo.svg" alt={brand.appName} className="size-12" />
+          <img src="/logo.svg" alt={displayName} className="size-12" />
 
           <div className="flex flex-col items-start text-left">
-            <span>Welcome to {brand.appName}</span>
+            <span>Welcome to {displayName}</span>
             <span className="text-muted-foreground text-sm font-normal">
               {brand.description.short}
             </span>
