@@ -24,22 +24,15 @@ export type AuthState = {
   user: AuthUser | null;
 };
 
-// ---- Timer (mirrors Rust timer.rs serde output) ----
+// ---- Timer (derived from the cloud active entry; see timer-context) ----
 
 export type TimerStatus = "IDLE" | "WORKING" | "BREAK";
 
 export type SegmentType = "WORK" | "BREAK";
 
-export type SegmentView = {
-  type: SegmentType;
-  started_at_ms: number;
-  ended_at_ms: number | null;
-  duration_ms: number;
-  /** Appwrite `time_entries` doc id, once the frontend creates the live record. */
-  remote_id: string | null;
-};
-
-export type PendingEntry = {
+/** Legacy closed-segment row from the old local `timer-state.json`
+ * (pre-realtime versions). Only used to drain the old upload queue. */
+export type LegacyPendingEntry = {
   local_id: string;
   task_id: string | null;
   project_id: string | null;
@@ -47,21 +40,33 @@ export type PendingEntry = {
   started_at: string;
   ended_at: string;
   attempts: number;
-  /** Set if a live doc already exists for this segment — update instead of create. */
+  /** Set if a live doc already exists for this entry — update, not create. */
   remote_id: string | null;
 };
 
+/** What the UI renders for the running timer. Derived from the single open
+ * Appwrite entry (endedAt = null); titles resolved from the shared lists. */
 export type TimerView = {
   status: TimerStatus;
+  /** Type of the open entry — WORKING/BREAK display state. */
+  kind: SegmentType;
   task_id: string | null;
   task_title: string | null;
   project_id: string | null;
   project_title: string | null;
   started_at_ms: number | null;
-  total_ms: number;
-  work_ms: number;
-  break_ms: number;
-  segments: SegmentView[];
-  pending_count: number;
-  pending: PendingEntry[];
+  /** Appwrite doc id of the open entry. */
+  entry_id: string | null;
+};
+
+// ---- Tray (frontend pushes state; Rust renders + emits actions back) ----
+
+export type TrayAction = "break" | "resume" | "stop";
+
+export type TrayState = {
+  running: boolean;
+  on_break: boolean;
+  /** Resolved task/project title, or null for "Untitled session". */
+  title: string | null;
+  elapsed_ms: number;
 };

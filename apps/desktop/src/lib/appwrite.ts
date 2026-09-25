@@ -4,7 +4,7 @@ import { brand } from "./brand";
 
 // Appwrite access for the desktop webview, mirroring the web app: the SDK
 // owns the user session (cookies/localStorage inside the webview). Rust
-// performs no network calls — it only persists local timer state.
+// performs no network calls — all cloud I/O (including realtime) lives here.
 
 // Custom scheme the OS routes back to this app after browser OAuth
 // (registered in tauri.conf.json via sync-brand).
@@ -19,7 +19,7 @@ export function isAppwriteConfigured(): boolean {
   return appwriteProjectId.length > 0;
 }
 
-function getClient(): Client | null {
+export function getClient(): Client | null {
   if (client !== undefined) return client;
   client =
     appwriteEndpoint && appwriteProjectId

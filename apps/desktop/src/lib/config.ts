@@ -1,6 +1,6 @@
-// Build-time client config (Vite `.env`). The Appwrite project ID is also
-// pushed to the Rust backend at boot (see `setAuthConfig`), so these values
-// only need to exist here.
+// Build-time client config (Vite `.env`). These values are compiled into
+// the webview bundle only — Rust never sees them (it performs no network
+// calls; all Appwrite I/O lives in the frontend).
 
 function requiredEnv(name: string, fallback: string): string {
   const value = import.meta.env[name] as string | undefined;

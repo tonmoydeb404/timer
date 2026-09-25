@@ -5,6 +5,7 @@ import {
     listTimeEntries,
     updateManualTimeEntry,
 } from "@/lib/db";
+import { lastSegment, subscribeToTimeEntries } from "@/lib/realtime";
 import { useAsyncAction } from "@/lib/use-async-action";
 import type { EntryType, Profile, TimeEntry } from "@packages/domain/index";
 import { useCallback, useEffect, useState } from "react";
@@ -41,6 +42,30 @@ export function useTimeEntriesData() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // Realtime keeps the shared list fresh — a timer stopped on this device
+  // (or any other) lands here without a manual reload, so Home/Times
+  // totals stay accurate.
+  useEffect(() => {
+    if (!userId) return;
+    const upsertRow = (row: TimeEntry) => {
+      setEntries((prev) => {
+        const exists = prev.some((e) => e.$id === row.$id);
+        const next = exists
+          ? prev.map((e) => (e.$id === row.$id ? row : e))
+          : [row, ...prev];
+        return next.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+      });
+    };
+    return subscribeToTimeEntries(userId, ({ events, entry }) => {
+      const action = lastSegment(events[events.length - 1] ?? "");
+      if (action === "delete") {
+        setEntries((prev) => prev.filter((e) => e.$id !== entry.$id));
+      } else {
+        upsertRow(entry);
+      }
+    });
+  }, [userId]);
 
   const timeZone =
     profile?.timezone ||

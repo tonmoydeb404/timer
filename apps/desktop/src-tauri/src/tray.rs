@@ -1,15 +1,28 @@
 //! Dynamic system-tray menu: the primary timer controls live here.
 //!
-//! The menu rebuilds on every timer transition (from `mutate_timer`) and on
-//! a periodic tick while a session is open, so the elapsed readout stays
-//! fresh without opening the window.
+//! Rust owns no timer state anymore — the frontend (which talks to
+//! Appwrite, including realtime) pushes a `TrayState` via `set_tray_state`
+//! whenever the running timer changes and on a 30s cadence for the elapsed
+//! readout. Menu clicks for timer controls are emitted back to the
+//! frontend as `tymar://tray-action` events.
 
+use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     AppHandle, Emitter, Manager,
 };
 
-use crate::{brand, state::AppState};
+use crate::brand;
+
+/// Mirrored timer state pushed from the frontend.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct TrayState {
+    pub running: bool,
+    pub on_break: bool,
+    pub title: Option<String>,
+    pub elapsed_ms: i64,
+}
 
 fn format_elapsed(total_ms: i64) -> String {
     let total = (total_ms.max(0) / 1000) as u64;
@@ -37,64 +50,63 @@ macro_rules! separator {
     };
 }
 
-/// Rebuilds the tray menu (and tooltip) from the current timer state.
+/// Rebuilds the tray menu (and tooltip) from the state the frontend pushed.
 pub fn rebuild_menu(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let store = crate::timer::load(&state.app_data_dir);
-    let view = crate::timer::view(&store, crate::timer::now_ms());
+    let state = app.state::<crate::state::AppState>();
+    let tray_state = state.tray.lock().ok().map(|g| g.clone()).unwrap_or_default();
 
     let menu = match Menu::new(app) {
         Ok(m) => m,
         Err(_) => return,
     };
 
-    match view.status {
-        crate::timer::TimerStatus::Idle => {
-            item!(
-                menu,
-                app,
-                "status",
-                &format!("{} — Idle", brand::APP_NAME),
-                false
-            );
-            separator!(menu, app);
-            item!(menu, app, "start", "Start Timer", true);
-            separator!(menu, app);
+    if !tray_state.running {
+        item!(
+            menu,
+            app,
+            "status",
+            &format!("{} — Idle", brand::APP_NAME),
+            false
+        );
+        separator!(menu, app);
+        item!(menu, app, "start", "Start Timer", true);
+        separator!(menu, app);
+    } else {
+        let title = tray_state
+            .title
+            .clone()
+            .unwrap_or_else(|| "Untitled session".into());
+        let state_label = if tray_state.on_break {
+            "On break"
+        } else {
+            "Tracking"
+        };
+        item!(
+            menu,
+            app,
+            "status",
+            &format!(
+                "● {} — {}",
+                title,
+                format_elapsed(tray_state.elapsed_ms)
+            ),
+            false
+        );
+        separator!(menu, app);
+        if tray_state.on_break {
+            item!(menu, app, "resume", "Resume", true);
+        } else {
+            item!(menu, app, "break", "Break", true);
         }
-        crate::timer::TimerStatus::Working | crate::timer::TimerStatus::Break => {
-            let title = view
-                .task_title
-                .clone()
-                .or_else(|| view.project_title.clone())
-                .unwrap_or_else(|| "Untitled session".into());
-            let state_label = if view.status == crate::timer::TimerStatus::Break {
-                "On break"
-            } else {
-                "Tracking"
-            };
-            item!(
-                menu,
-                app,
-                "status",
-                &format!("● {} — {}", title, format_elapsed(view.total_ms)),
-                false
-            );
-            separator!(menu, app);
-            if view.status == crate::timer::TimerStatus::Break {
-                item!(menu, app, "break_resume", "Resume", true);
-            } else {
-                item!(menu, app, "break_resume", "Break", true);
-            }
-            item!(menu, app, "stop", "Stop", true);
-            item!(menu, app, "switch", "Switch Task", true);
-            separator!(menu, app);
+        item!(menu, app, "stop", "Stop", true);
+        item!(menu, app, "switch", "Switch Task", true);
+        separator!(menu, app);
 
-            if let Some(tray) = app.tray_by_id("main_tray") {
-                let _ = tray.set_tooltip(Some(format!(
-                    "{state_label}: {title} ({})",
-                    format_elapsed(view.total_ms)
-                )));
-            }
+        if let Some(tray) = app.tray_by_id("main_tray") {
+            let _ = tray.set_tooltip(Some(format!(
+                "{state_label}: {title} ({})",
+                format_elapsed(tray_state.elapsed_ms)
+            )));
         }
     }
 
@@ -115,7 +127,7 @@ pub fn rebuild_menu(app: &AppHandle) {
 
     if let Some(tray) = app.tray_by_id("main_tray") {
         let _ = tray.set_menu(Some(menu));
-        if view.status == crate::timer::TimerStatus::Idle {
+        if !tray_state.running {
             let _ = tray.set_tooltip(Some(brand::APP_NAME));
         }
     }
@@ -129,30 +141,13 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
         "quit" => {
             app.exit(0);
         }
-        "break_resume" => {
-            let app = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let state = app.state::<AppState>();
-                let store = crate::timer::load(&state.app_data_dir);
-                let on_break = matches!(
-                    store.active.as_ref().map(|a| a.status),
-                    Some(crate::timer::TimerStatus::Break)
-                );
-                if on_break {
-                    let _ = crate::commands::resume_timer(app.clone()).await;
-                } else {
-                    let _ = crate::commands::take_break(app.clone()).await;
-                }
-            });
-        }
-        "stop" => {
-            let app = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = crate::commands::stop_timer(app.clone()).await;
-            });
+        // Timer controls are performed by the frontend (the only place with
+        // an Appwrite session); emit the intent and let it act.
+        "break" | "resume" | "stop" => {
+            let _ = app.emit("tymar://tray-action", id.to_string());
         }
         "switch" => {
-            // The task picker lives in the Today screen: open the window and
+            // The task picker lives in the Home screen: open the window and
             // ask the frontend to show it.
             crate::show_window(app);
             let _ = app.emit("tymar://open-switcher", ());
