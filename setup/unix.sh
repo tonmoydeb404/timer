@@ -54,10 +54,18 @@ install_macos() {
   echo "==> Tapping ${TAP}..."
   brew tap "$TAP" "$TAP_URL"
 
+  # `brew tap` is a no-op when the tap already exists, and
+  # HOMEBREW_NO_AUTO_UPDATE=1 disables the auto-update that would otherwise
+  # refresh it. Pull the tap explicitly so a new release is visible;
+  # otherwise `brew install` keeps reporting "already installed" on the
+  # previously installed version.
+  echo "==> Updating ${TAP}..."
+  git -C "$(brew --repo "$TAP")" pull --ff-only -q 2>/dev/null || true
+
   echo "==> Trusting ${TAP}..."
   brew trust "$TAP" 2>/dev/null || true
 
-  echo "==> Installing ${APP_NAME} into /Applications..."
+  echo "==> Installing ${APP_NAME} ${TAG} into /Applications..."
   echo "    Your login password is required to complete the install."
   sudo -v
   # Keep sudo credentials fresh so a slow install never re-prompts.
@@ -65,7 +73,14 @@ install_macos() {
   SUDO_KEEPALIVE_PID=$!
   trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
 
-  brew install --cask "${PACKAGE}"
+  # `brew install` never upgrades an already-installed cask, so a re-run
+  # of this installer would stick on the old version. Upgrade when present,
+  # install when not.
+  if brew list --cask "${PACKAGE}" >/dev/null 2>&1; then
+    brew upgrade --cask "${PACKAGE}"
+  else
+    brew install --cask "${PACKAGE}"
+  fi
 
   # The app is unsigned; clear macOS quarantine so it isn't flagged as damaged.
   if [ -d "/Applications/${APP_NAME}.app" ]; then
