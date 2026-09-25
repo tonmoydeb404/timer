@@ -8,7 +8,17 @@ import type { UpdateInfo } from "@/types";
 import { Button } from "@packages/ui/components/button";
 import { Switch } from "@packages/ui/components/switch";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ExternalLink, LogIn, LogOut, Moon, RefreshCw, Rocket } from "lucide-react";
+import {
+  ExternalLink,
+  Loader2,
+  LogIn,
+  LogOut,
+  LucideInfo,
+  LucideMoon,
+  LucideRocket,
+  LucideUserCircle2,
+  RefreshCw,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -22,7 +32,7 @@ function Section({
 }) {
   return (
     <section className="grid gap-2">
-      <h2 className="px-1 font-mono text-[10px] font-semibold tracking-wider text-faint uppercase">
+      <h2 className="px-1 font-mono text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
         {title}
       </h2>
       {children}
@@ -37,9 +47,9 @@ function Row({
   control,
 }: {
   icon?: React.ReactNode;
-  title: string;
-  description?: string;
-  control: React.ReactNode;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  control?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
@@ -49,12 +59,12 @@ function Row({
             {icon}
           </span>
         )}
-        <span className="grid min-w-0 gap-0.5">
-          <strong className="truncate text-xs font-semibold text-ink">
+        <span className="grid min-w-0 gap-0">
+          <strong className="truncate text-sm font-medium text-ink">
             {title}
           </strong>
           {description && (
-            <small className="truncate text-[11px] text-muted-foreground">
+            <small className="truncate text-[13px] text-muted-foreground">
               {description}
             </small>
           )}
@@ -68,8 +78,14 @@ function Row({
 // Settings tab: appearance, system, account, about. Mirrors the desktop
 // settings dialog content inline for the popup layout.
 export function SettingsScreen() {
-  const { auth, signIn, signOut, signingIn, installUpdate, isInstallingUpdate } =
-    useApp();
+  const {
+    auth,
+    signIn,
+    signOut,
+    signingIn,
+    installUpdate,
+    isInstallingUpdate,
+  } = useApp();
   const { theme, setTheme } = useTheme();
   const [autostart, setAutostart] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -124,9 +140,51 @@ export function SettingsScreen() {
     <section className="mx-auto grid h-full w-full max-w-[420px] content-start gap-4 overflow-y-auto scrollbar-thin px-3.5 pt-4 pb-4">
       <ScreenHeader title="Settings" />
 
-      <Section title="Appearance">
+      <Section title="Account">
+        {auth?.status === "active" && auth.user ? (
+          <Row
+            title={auth.user.name || auth.user.email}
+            description={auth.user.email}
+            control={
+              <Button
+                variant="destructive"
+                onClick={() => void signOut()}
+                size={"icon-lg"}
+              >
+                <LogOut size={14} />
+              </Button>
+            }
+            icon={<LucideUserCircle2 size={20} />}
+          />
+        ) : (
+          <Row
+            title="Not signed in"
+            description={
+              auth?.status === "unknown"
+                ? "Couldn't reach Appwrite."
+                : "You're signed out."
+            }
+            control={
+              <Button
+                size="icon-lg"
+                onClick={() =>
+                  void signIn().then((r) => {
+                    if (!r.ok && r.message) toast.error(r.message);
+                  })
+                }
+                disabled={signingIn}
+              >
+                {signingIn ? <Loader2 size={14} /> : <LogIn size={14} />}
+              </Button>
+            }
+            icon={<LucideUserCircle2 size={20} />}
+          />
+        )}
+      </Section>
+
+      <Section title="System">
         <Row
-          icon={<Moon size={15} />}
+          icon={<LucideMoon size={20} />}
           title="Dark theme"
           description="Toggle between dark and light."
           control={
@@ -137,11 +195,8 @@ export function SettingsScreen() {
             />
           }
         />
-      </Section>
-
-      <Section title="System">
         <Row
-          icon={<Rocket size={15} />}
+          icon={<LucideRocket size={20} />}
           title="Start at login"
           description="Launch automatically on boot."
           control={
@@ -154,63 +209,22 @@ export function SettingsScreen() {
         />
       </Section>
 
-      <Section title="Account">
-        <div className="grid gap-2 rounded-xl border border-border bg-card p-3">
-          {auth?.status === "active" && auth.user ? (
-            <>
-              <span className="truncate text-xs font-semibold text-ink">
-                {auth.user.name || auth.user.email}
-              </span>
-              {auth.user.name && (
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {auth.user.email}
-                </span>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void signOut()}
-                className="mt-1 w-fit text-muted-foreground"
-              >
-                <LogOut size={14} />
-                Sign out
-              </Button>
-            </>
-          ) : (
-            <>
-              <span className="text-[11px] text-muted-foreground">
-                {auth?.status === "unknown"
-                  ? "Couldn't reach Appwrite."
-                  : "You're signed out."}
-              </span>
-              <Button
-                size="sm"
-                onClick={() =>
-                  void signIn().then((r) => {
-                    if (!r.ok && r.message) toast.error(r.message);
-                  })
-                }
-                disabled={signingIn}
-                className="mt-1 w-fit"
-              >
-                <LogIn size={14} />
-                {signingIn ? "Waiting for Google…" : "Sign in with Google"}
-              </Button>
-            </>
-          )}
-        </div>
-      </Section>
-
       <Section title="About">
-        <div className="grid gap-1 rounded-xl border border-border bg-card p-3 text-[11px] text-muted-foreground">
-          <span className="text-xs font-semibold text-ink">
-            {displayName} <span className="text-faint">v{brand.version}</span>
-          </span>
-          <span>{brand.description.short}</span>
+        <Row
+          icon={<LucideInfo size={20} />}
+          title={
+            <>
+              {displayName}{" "}
+              <span className="text-primary">v{brand.version}</span>
+            </>
+          }
+          description={brand.description.short}
+          control={<></>}
+        />
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="mt-1 w-fit"
             onClick={handleCheckForUpdate}
             disabled={checkingUpdate || isInstallingUpdate}
           >
@@ -221,13 +235,12 @@ export function SettingsScreen() {
             {checkingUpdate ? "Checking…" : "Check for updates"}
           </Button>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="h-auto w-fit p-0 text-[11px] text-primary underline-offset-2 hover:underline"
             onClick={() => openUrl(brand.repository).catch(() => {})}
           >
             <ExternalLink size={12} />
-            View source on GitHub
+            View source
           </Button>
         </div>
       </Section>
