@@ -1,40 +1,28 @@
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 import { Button } from "@packages/ui/components/button";
 
-type ThemeOption = "light" | "dark" | "system";
+type ThemeOption = "light" | "dark";
 
 const config: Record<
   ThemeOption,
   { icon: typeof Sun; label: string; next: ThemeOption }
 > = {
   light: { icon: Sun, label: "Light", next: "dark" },
-  dark: { icon: Moon, label: "Dark", next: "system" },
-  system: { icon: Monitor, label: "System", next: "light" },
+  dark: { icon: Moon, label: "Dark", next: "light" },
 };
 
 export function ThemeToggle() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d") {
-        event.preventDefault();
-        setTheme(resolvedTheme === "dark" ? "light" : "dark");
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [resolvedTheme, setTheme]);
-
-  const current = (theme as ThemeOption | undefined) ?? "system";
+  const current: ThemeOption = theme === "dark" ? "dark" : "light";
   const { icon: Icon, label, next } = config[current];
 
   return (

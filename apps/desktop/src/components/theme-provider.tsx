@@ -33,7 +33,7 @@ export function AppThemeProvider({
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="light"
       storageKey={`${brand.slug}-theme`}
       enableSystem={false}
       disableTransitionOnChange
