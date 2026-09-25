@@ -1,5 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "com.tonmoydeb.tymar.dev",
-  "productName": "Tymar Dev"
+  "productName": "Tymar Dev",
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "tymar-dev"
+        ]
+      }
+    }
+  }
 }

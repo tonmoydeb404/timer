@@ -1,5 +1,6 @@
 import { useApp } from "@/context/app-context";
 import { displayName } from "@/lib/display-name";
+import { OAUTH_CALLBACK_URL } from "@/lib/appwrite";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { useState } from "react";
@@ -140,7 +141,7 @@ export function LoginScreen() {
                 void handlePasteLink();
               }
             }}
-            placeholder="tymar://auth?userId=…&secret=…"
+            placeholder={`${OAUTH_CALLBACK_URL}?userId=…&secret=…`}
             autoComplete="off"
             spellCheck={false}
             aria-label="Sign-in link"

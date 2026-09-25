@@ -49,10 +49,11 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // Windows/Linux deliver deep links by spawning a new instance:
-            // forward tymar:// URLs to the running app instead.
+            // forward configured deep-link URLs to the running app instead.
+            let deep_link_prefix = format!("{}://", env::deep_link_scheme());
             let urls: Vec<String> = args
                 .into_iter()
-                .filter(|a| a.starts_with("tymar://"))
+                .filter(|a| a.starts_with(deep_link_prefix.as_str()))
                 .collect();
             if !urls.is_empty() {
                 let _ = app.emit("tymar://deep-link", urls);
@@ -60,7 +61,7 @@ pub fn run() {
             crate::show_window(app);
         }))
         .setup(|app| {
-            // Register the `tymar://` scheme where the OS needs runtime
+            // Register the configured deep-link scheme where the OS needs runtime
             // registration (Windows registry / Linux desktop entry).
             // macOS registers schemes via the bundled Info.plist, and the
             // plugin reports UnsupportedPlatform there — never fatal.

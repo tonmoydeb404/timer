@@ -9,6 +9,14 @@ pub fn is_dev() -> bool {
     cfg!(debug_assertions)
 }
 
+pub fn deep_link_scheme() -> String {
+    if is_dev() {
+        format!("{}-dev", crate::brand::SLUG)
+    } else {
+        crate::brand::SLUG.to_string()
+    }
+}
+
 /// App display name with the dev postfix applied — "Tymar Dev" in dev,
 /// "Tymar" in production. Used for the window title and tray.
 pub fn display_name() -> String {

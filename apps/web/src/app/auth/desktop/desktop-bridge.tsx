@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { appPaths } from "@/config/paths-config";
+import { appPaths, externalUrls } from "@/config/paths-config";
 
 // Bridge for desktop OAuth: Appwrite only redirects to registered https
 // origins, so the desktop flow lands here first and hops to the app's
-// `tymar://` scheme, which the OS routes back to the desktop client.
-const DESKTOP_SCHEME_URL = "tymar://auth";
+// configured desktop scheme, which the OS routes back to the desktop client.
+const DESKTOP_SCHEMES = new Set<string>([
+  externalUrls.slug,
+  externalUrls.devSlug,
+]);
 
 export function DesktopBridge() {
   const searchParams = useSearchParams();
@@ -18,8 +21,13 @@ export function DesktopBridge() {
   const deepLink = useMemo(() => {
     const userId = searchParams.get("userId");
     const secret = searchParams.get("secret");
+    const requestedScheme = searchParams.get("scheme");
+    const scheme =
+      requestedScheme && DESKTOP_SCHEMES.has(requestedScheme)
+        ? requestedScheme
+        : externalUrls.slug;
     if (!userId || !secret) return null;
-    const url = new URL(DESKTOP_SCHEME_URL);
+    const url = new URL(`${scheme}://auth`);
     url.searchParams.set("userId", userId);
     url.searchParams.set("secret", secret);
     return url.toString();
