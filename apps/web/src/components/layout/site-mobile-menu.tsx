@@ -1,13 +1,12 @@
 "use client";
 
-import { Menu } from "lucide-react";
 import { APP_NAME } from "@/content/homepage";
+import { Menu } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { sitePaths } from "@/config/paths-config";
-import { cn } from "@/lib/utils";
-import { Button, buttonVariants } from "@packages/ui/components/button";
+import { appPaths, sitePaths } from "@/config/paths-config";
+import { Button } from "@packages/ui/components/button";
 import {
   Drawer,
   DrawerContent,
@@ -62,15 +61,15 @@ export function SiteMobileMenu() {
             )}
           </nav>
           <DrawerFooter>
-            <a
-              href={sitePaths.download}
-              target="_blank"
-              rel="noreferrer"
-              className={cn(buttonVariants(), "w-full")}
-              onClick={() => setMobileOpen(false)}
-            >
-              Download latest release
-            </a>
+            <Button
+              nativeButton={false}
+              render={<Link href={sitePaths.download}>Download</Link>}
+              variant={"secondary"}
+            />
+            <Button
+              nativeButton={false}
+              render={<Link href={appPaths.login}>Login</Link>}
+            />
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
