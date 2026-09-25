@@ -3,53 +3,76 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import type { EntryType, TimeEntry } from "@packages/domain/index";
 import { toast } from "sonner";
-import { api, onTimerChanged } from "../lib/api";
-import { createOpenTimeEntry, uploadTimeEntries } from "../lib/db";
-import type { TimerView } from "../types";
 import { useApp } from "./app-context";
+import { useProjects, useTasks } from "./db/db-context";
+import { api, onTrayAction } from "../lib/api";
+import {
+  closeTimeEntry,
+  createOpenTimeEntry,
+  getActiveTimeEntry,
+  uploadTimeEntries,
+  type PendingUpload,
+} from "../lib/db";
+import { lastSegment, subscribeToTimeEntries } from "../lib/realtime";
+import type { TimerStatus, TimerView } from "../types";
 
 type TimerContextValue = {
-  /** Latest view from Rust; null until the first load. */
-  view: TimerView | null;
+  /** Derived from the cloud's open entry (endedAt = null) — status IDLE
+   * when nothing is running, for this user, on any device. */
+  view: TimerView;
   /** True while a timer action is in flight. */
   busy: boolean;
-  /** Epoch ms when `view` was received — drives the ticking display. */
+  /** Elapsed ms of the open entry captured when `fetchedAt` was stamped —
+   * add `Date.now() - fetchedAt` for the live value (clock-skew safe). */
+  elapsedMsBase: number;
+  /** Epoch ms when the current view/anchor was received. */
   fetchedAt: number;
 
-  refresh: () => Promise<void>;
-  start: (
-    taskId: string | null,
-    taskTitle: string | null,
-    projectId: string | null,
-    projectTitle: string | null,
-  ) => Promise<void>;
+  start: (taskId: string | null, projectId: string | null) => Promise<void>;
   takeBreak: () => Promise<void>;
   resume: () => Promise<void>;
   stop: () => Promise<void>;
-  switchTo: (
-    taskId: string | null,
-    taskTitle: string | null,
-    projectId: string | null,
-    projectTitle: string | null,
-  ) => Promise<void>;
+  switchTo: (taskId: string | null, projectId: string | null) => Promise<void>;
 };
 
 const TimerContext = createContext<TimerContextValue | null>(null);
 
+const IDLE_VIEW: TimerView = {
+  status: "IDLE",
+  kind: "WORK",
+  task_id: null,
+  task_title: null,
+  project_id: null,
+  project_title: null,
+  started_at_ms: null,
+  entry_id: null,
+};
+
+function startedAtMs(entry: TimeEntry): number | null {
+  const ms = new Date(entry.startedAt).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 export function TimerProvider({ children }: { children: ReactNode }) {
   const { auth } = useApp();
-  const [view, setView] = useState<TimerView | null>(null);
+  const { tasks } = useTasks();
+  const { projects } = useProjects();
+  const userId = auth?.user?.id ?? null;
+
+  const [active, setActive] = useState<TimeEntry | null>(null);
   const [busy, setBusy] = useState(false);
+  const [elapsedMsBase, setElapsedMsBase] = useState(0);
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
   const mounted = useRef(true);
-  const uploading = useRef<Set<string>>(new Set());
-  const creatingRemote = useRef<Set<number>>(new Set());
-  const userId = auth?.user?.id ?? null;
+  const activeRef = useRef<TimeEntry | null>(null);
+  const busyRef = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -58,131 +81,327 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const apply = useCallback((next: TimerView) => {
+  /** Single convergence point: adopting a cloud entry (or none) resets the
+   * elapsed anchor so the ticking display never jumps. */
+  const apply = useCallback((entry: TimeEntry | null) => {
     if (!mounted.current) return;
-    setView(next);
-    setFetchedAt(Date.now());
+    activeRef.current = entry;
+    setActive(entry);
+    const start = entry ? startedAtMs(entry) : null;
+    const now = Date.now();
+    setElapsedMsBase(start === null ? 0 : Math.max(0, now - start));
+    setFetchedAt(now);
   }, []);
 
-  const refresh = useCallback(async () => {
-    try {
-      apply(await api.getTimerState());
-    } catch {
-      // Rust only fails here on IO — keep the last known view.
+  // ---- Realtime is the source of truth for the running timer ----
+
+  useEffect(() => {
+    if (!userId) {
+      apply(null);
+      return;
     }
-  }, [apply]);
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
 
-  useEffect(() => {
-    void refresh();
-    const unlisten = onTimerChanged((next) => apply(next));
-    return () => {
-      unlisten.then((fn) => fn());
+    const handleEvent = (events: string[], entry: TimeEntry) => {
+      const action = events.map(lastSegment).find((s) =>
+        ["create", "update", "upsert", "delete"].includes(s),
+      );
+      const current = activeRef.current;
+
+      if (action === "delete") {
+        if (current && entry.$id === current.$id) apply(null);
+        return;
+      }
+      if (!entry.endedAt) {
+        // An entry opened anywhere becomes the running timer — adopt the
+        // newest when two open entries somehow coexist.
+        if (
+          !current ||
+          entry.$id === current.$id ||
+          entry.startedAt >= current.startedAt
+        ) {
+          apply(entry);
+        }
+      } else if (current && entry.$id === current.$id) {
+        apply(null);
+      }
     };
-  }, [refresh, apply]);
 
-  // Create the live (open-ended) record for the currently open segment as
-  // soon as it appears — this is what lets other devices see/control a
-  // running timer instead of only finding out once it's stopped.
-  useEffect(() => {
-    const open = view?.segments.find((s) => s.ended_at_ms === null);
-    if (!userId || !open || open.remote_id) return;
-    if (creatingRemote.current.has(open.started_at_ms)) return;
-    creatingRemote.current.add(open.started_at_ms);
     (async () => {
+      // One API call at boot: is something already running (any device)?
       try {
-        const doc = await createOpenTimeEntry(userId, {
-          task_id: view?.task_id ?? null,
-          project_id: view?.project_id ?? null,
-          type: open.type,
-          started_at: new Date(open.started_at_ms).toISOString(),
-        });
-        apply(await api.attachOpenSegmentRemoteId(doc.$id));
+        const current = await getActiveTimeEntry(userId);
+        if (!cancelled) apply(current);
       } catch {
-        // Stays unattached; retried on the next view change (e.g. tick).
-      } finally {
-        creatingRemote.current.delete(open.started_at_ms);
+        // Offline at boot — realtime + refetches reconcile once connected.
       }
+      if (cancelled) return;
+      unsubscribe = subscribeToTimeEntries(userId, (event) =>
+        handleEvent(event.events, event.entry),
+      );
     })();
-  }, [view, userId, apply]);
 
-  // Upload closed segments via the Appwrite SDK, then ack them in Rust.
-  // Runs on every view change (actions, tray, boot) — the footer surfaces
-  // the leftover count while offline.
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [userId, apply]);
+
+  // ---- Safety refetch: focus and a periodic net (realtime reconnects,
+  // missed events, socket drops while throttled) ----
+
   useEffect(() => {
-    const pending = view?.pending ?? [];
-    if (!userId || pending.length === 0) return;
-    const fresh = pending.filter((e) => !uploading.current.has(e.local_id));
-    if (fresh.length === 0) return;
-    for (const e of fresh) uploading.current.add(e.local_id);
-    (async () => {
+    if (!userId) return;
+    const refetch = async () => {
+      if (document.visibilityState !== "visible" || busyRef.current) return;
       try {
-        const ids = await uploadTimeEntries(userId, fresh);
-        apply(await api.ackEntries(ids));
+        apply(await getActiveTimeEntry(userId));
       } catch {
-        // Stay queued; the next view change retries.
-      } finally {
-        for (const e of fresh) uploading.current.delete(e.local_id);
+        // Keep last known state; retried on the next tick.
       }
-    })();
-  }, [view, userId, apply]);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refetch();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    const interval = setInterval(() => void refetch(), 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearInterval(interval);
+    };
+  }, [userId, apply]);
+
+  // ---- Actions: direct Appwrite writes; cloud state updates from the
+  // response, realtime echoes are idempotent ----
 
   const run = useCallback(
-    async (fn: () => Promise<TimerView>, action: string) => {
+    async (action: string, fn: () => Promise<void>) => {
+      busyRef.current = true;
       setBusy(true);
       try {
-        apply(await fn());
+        await fn();
       } catch (err) {
         toast.error(`${action} failed`, {
           description: err instanceof Error ? err.message : String(err),
         });
       } finally {
+        busyRef.current = false;
         if (mounted.current) setBusy(false);
       }
     },
-    [apply],
+    [],
   );
 
   const start = useCallback(
-    (
-      taskId: string | null,
-      taskTitle: string | null,
-      projectId: string | null,
-      projectTitle: string | null,
-    ) =>
-      run(
-        () => api.startTimer(taskId, taskTitle, projectId, projectTitle),
-        "Start",
-      ),
-    [run],
+    async (taskId: string | null, projectId: string | null) =>
+      run("Start", async () => {
+        if (!userId) throw new Error("You're signed out.");
+        if (activeRef.current)
+          throw new Error("A timer is already running — switch task instead.");
+        const doc = await createOpenTimeEntry(userId, {
+          task_id: taskId,
+          project_id: projectId,
+          type: "WORK" satisfies EntryType,
+          started_at: new Date().toISOString(),
+        });
+        apply(doc);
+      }),
+    [run, userId, apply],
   );
+
   const takeBreak = useCallback(
-    () => run(() => api.takeBreak(), "Break"),
-    [run],
+    () =>
+      run("Break", async () => {
+        if (!userId) throw new Error("You're signed out.");
+        const current = activeRef.current;
+        if (!current) throw new Error("No timer is running.");
+        if (current.type === "BREAK")
+          throw new Error("Already on a break.");
+        await closeTimeEntry(current.$id, new Date().toISOString());
+        try {
+          apply(
+            await createOpenTimeEntry(userId, {
+              task_id: current.taskId,
+              project_id: current.projectId,
+              type: "BREAK",
+              started_at: new Date().toISOString(),
+            }),
+          );
+        } catch (err) {
+          apply(null); // truthful: the cloud has no open entry now
+          throw err;
+        }
+      }),
+    [run, userId, apply],
   );
+
   const resume = useCallback(
-    () => run(() => api.resumeTimer(), "Resume"),
-    [run],
+    () =>
+      run("Resume", async () => {
+        if (!userId) throw new Error("You're signed out.");
+        const current = activeRef.current;
+        if (!current) throw new Error("No timer is running.");
+        if (current.type !== "BREAK")
+          throw new Error("Timer is not on a break.");
+        await closeTimeEntry(current.$id, new Date().toISOString());
+        try {
+          apply(
+            await createOpenTimeEntry(userId, {
+              task_id: current.taskId,
+              project_id: current.projectId,
+              type: "WORK",
+              started_at: new Date().toISOString(),
+            }),
+          );
+        } catch (err) {
+          apply(null);
+          throw err;
+        }
+      }),
+    [run, userId, apply],
   );
-  const stop = useCallback(() => run(() => api.stopTimer(), "Stop"), [run]);
+
+  const stop = useCallback(
+    () =>
+      run("Stop", async () => {
+        if (!userId) throw new Error("You're signed out.");
+        const current = activeRef.current;
+        if (!current) throw new Error("No timer is running.");
+        await closeTimeEntry(current.$id, new Date().toISOString());
+        apply(null);
+      }),
+    [run, userId, apply],
+  );
+
   const switchTo = useCallback(
-    (
-      taskId: string | null,
-      taskTitle: string | null,
-      projectId: string | null,
-      projectTitle: string | null,
-    ) =>
-      run(
-        () => api.switchTask(taskId, taskTitle, projectId, projectTitle),
-        "Switch",
-      ),
-    [run],
+    async (taskId: string | null, projectId: string | null) =>
+      run("Switch", async () => {
+        if (!userId) throw new Error("You're signed out.");
+        const current = activeRef.current;
+        if (!current) throw new Error("No timer is running.");
+        await closeTimeEntry(current.$id, new Date().toISOString());
+        try {
+          apply(
+            await createOpenTimeEntry(userId, {
+              task_id: taskId,
+              project_id: projectId,
+              type: "WORK",
+              started_at: new Date().toISOString(),
+            }),
+          );
+        } catch (err) {
+          apply(null);
+          throw err;
+        }
+      }),
+    [run, userId, apply],
   );
+
+  // ---- Derived view (titles resolved from the shared lists) ----
+
+  const view = useMemo<TimerView>(() => {
+    if (!active) return IDLE_VIEW;
+    const taskTitle = active.taskId
+      ? (tasks.find((t) => t.$id === active.taskId)?.title ?? null)
+      : null;
+    const projectTitle = active.projectId
+      ? (projects.find((p) => p.$id === active.projectId)?.name ?? null)
+      : null;
+    const status: TimerStatus = active.type === "BREAK" ? "BREAK" : "WORKING";
+    return {
+      status,
+      kind: active.type,
+      task_id: active.taskId,
+      task_title: taskTitle,
+      project_id: active.projectId,
+      project_title: projectTitle,
+      started_at_ms: startedAtMs(active),
+      entry_id: active.$id,
+    };
+  }, [active, tasks, projects]);
+
+  // ---- Tray mirror: Rust renders whatever we push; menu clicks come back
+  // as events and run the same actions ----
+
+  const pushTray = useCallback((v: TimerView, elapsed: number) => {
+    void api
+      .setTrayState({
+        running: v.status !== "IDLE",
+        on_break: v.status === "BREAK",
+        title: v.task_title ?? v.project_title ?? null,
+        elapsed_ms: elapsed,
+      })
+      .catch(() => {
+        // Tray is cosmetic; never surface push failures.
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      pushTray(IDLE_VIEW, 0);
+      return;
+    }
+    const running = view.status !== "IDLE";
+    pushTray(
+      view,
+      running ? Math.max(0, elapsedMsBase + Date.now() - fetchedAt) : 0,
+    );
+    if (!running) return;
+    // Keep the tray's elapsed readout fresh (replaces the old Rust tick).
+    const interval = setInterval(() => {
+      pushTray(view, Math.max(0, elapsedMsBase + Date.now() - fetchedAt));
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [view, elapsedMsBase, fetchedAt, userId, pushTray]);
+
+  useEffect(() => {
+    const unlisten = onTrayAction((action) => {
+      if (action === "break") void takeBreak();
+      else if (action === "resume") void resume();
+      else void stop();
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [takeBreak, resume, stop]);
+
+  // ---- Legacy drain: upload closed segments queued by pre-realtime
+  // versions in timer-state.json, then clear them from the file ----
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const pending = await api.getLegacyPending();
+        if (cancelled || pending.length === 0) return;
+        const uploads: PendingUpload[] = pending.map((e) => ({
+          local_id: e.local_id,
+          task_id: e.task_id,
+          project_id: e.project_id,
+          type: e.type,
+          started_at: e.started_at,
+          ended_at: e.ended_at,
+          remote_id: e.remote_id,
+        }));
+        const ids = await uploadTimeEntries(userId, uploads);
+        if (cancelled) return;
+        await api.clearLegacyPending(ids);
+      } catch {
+        // Old file is untouched until upload succeeds — retried next boot.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const value: TimerContextValue = {
     view,
     busy,
+    elapsedMsBase,
     fetchedAt,
-    refresh,
     start,
     takeBreak,
     resume,

@@ -377,6 +377,10 @@ const tauriDevConf = JSON.parse(
 );
 tauriDevConf.identifier = `${brand.identifier}.dev`;
 tauriDevConf.productName = `${brand.appName} Dev`;
+tauriDevConf.plugins ??= {};
+tauriDevConf.plugins["deep-link"] ??= {};
+tauriDevConf.plugins["deep-link"].desktop ??= {};
+tauriDevConf.plugins["deep-link"].desktop.schemes = [`${brand.slug}-dev`];
 
 // Cargo.toml: rename the crate + lib BEFORE using the old name to patch
 // Cargo.lock (which still refers to the pre-rename package).
@@ -548,6 +552,8 @@ uninstallPs1 = rebrandNames(uninstallPs1);
 const externalUrlsBlock = `export const externalUrls = {
   site: "${brand.developer.website}",
   appName: "${brand.appName}",
+  slug: "${brand.slug}",
+  devSlug: "${brand.slug}-dev",
   descriptionShort: "${brand.description.short}",
   download: "${brand.downloadUrl}",
   repository: "${brand.repository}",

@@ -14,6 +14,8 @@
 export const externalUrls = {
   site: "https://tonmoydeb.com",
   appName: "Tymar",
+  slug: "tymar",
+  devSlug: "tymar-dev",
   descriptionShort: "Effortless time tracking for focused work.",
   download: "https://github.com/tonmoydeb404/tymar/releases/latest",
   repository: "https://github.com/tonmoydeb404/tymar",

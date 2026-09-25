@@ -1,45 +1,26 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { TimerView, UpdateInfo } from "../types";
+import type {
+  LegacyPendingEntry,
+  TrayAction,
+  TrayState,
+  UpdateInfo,
+} from "../types";
 
 // All IPC wrappers live here — one entry per Rust command in
-// src-tauri/src/commands.rs. Appwrite I/O happens in the webview via the
-// Appwrite SDK (see lib/appwrite.ts, lib/db.ts); Rust owns local state.
+// src-tauri/src/commands.rs. Appwrite I/O (including realtime) happens in
+// the webview via the SDK (see lib/appwrite.ts, lib/db.ts, lib/realtime.ts);
+// Rust only renders the tray from pushed state.
 
 export const api = {
-  getTimerState: () => invoke<TimerView>("get_timer_state"),
-  ackEntries: (localIds: string[]) =>
-    invoke<TimerView>("ack_entries", { localIds }),
-  startTimer: (
-    taskId: string | null,
-    taskTitle: string | null,
-    projectId: string | null,
-    projectTitle: string | null,
-  ) =>
-    invoke<TimerView>("start_timer", {
-      taskId,
-      taskTitle,
-      projectId,
-      projectTitle,
-    }),
-  takeBreak: () => invoke<TimerView>("take_break"),
-  resumeTimer: () => invoke<TimerView>("resume_timer"),
-  stopTimer: () => invoke<TimerView>("stop_timer"),
-  switchTask: (
-    taskId: string | null,
-    taskTitle: string | null,
-    projectId: string | null,
-    projectTitle: string | null,
-  ) =>
-    invoke<TimerView>("switch_task", {
-      taskId,
-      taskTitle,
-      projectId,
-      projectTitle,
-    }),
-  /** Attaches the just-created Appwrite doc id to the currently open segment. */
-  attachOpenSegmentRemoteId: (remoteId: string) =>
-    invoke<TimerView>("attach_open_segment_remote_id", { remoteId }),
+  /** Legacy (pre-realtime) closed segments waiting for upload. */
+  getLegacyPending: () => invoke<LegacyPendingEntry[]>("get_legacy_pending"),
+  clearLegacyPending: (localIds: string[]) =>
+    invoke<void>("clear_legacy_pending", { localIds }),
+
+  /** Frontend is the timer source of truth; Rust only mirrors it here. */
+  setTrayState: (state: TrayState) =>
+    invoke<void>("set_tray_state", { state }),
 
   getSettings: () => invoke<Record<string, string>>("get_settings"),
   setSetting: (key: string, value: string) =>
@@ -50,6 +31,8 @@ export const api = {
   isAutostartEnabled: () => invoke<boolean>("is_autostart_enabled"),
 
   installUpdate: () => invoke<void>("install_update"),
+  /** Manual updater check (settings) — null when up to date. */
+  checkForUpdate: () => invoke<UpdateInfo | null>("check_for_update"),
 };
 
 // Backend → frontend events (emitted from Rust with app.emit(...)).
@@ -62,10 +45,11 @@ export function onUpdateAvailable(
   );
 }
 
-export function onTimerChanged(
-  callback: (payload: TimerView) => void,
+/** Tray menu clicked a timer control; the frontend performs the API call. */
+export function onTrayAction(
+  callback: (action: TrayAction) => void,
 ): Promise<UnlistenFn> {
-  return listen<TimerView>("tymar://changed", (event) =>
+  return listen<TrayAction>("tymar://tray-action", (event) =>
     callback(event.payload),
   );
 }

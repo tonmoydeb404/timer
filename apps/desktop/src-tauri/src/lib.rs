@@ -1,11 +1,13 @@
 use tauri::{image::Image, menu::MenuEvent, tray::TrayIconBuilder, Emitter, Manager};
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(target_os = "windows")]
 use tauri_plugin_deep_link::DeepLinkExt;
-use tauri_plugin_updater::UpdaterExt;
 
 mod brand;
 mod commands;
 mod db;
+#[cfg(target_os = "linux")]
+mod deep_link;
+mod env;
 mod migrations;
 mod state;
 mod timer;
@@ -27,30 +29,11 @@ pub fn show_window(app: &tauri::AppHandle) {
     }
 }
 
-// checks for a newer build and notifies the frontend; the user decides whether
-// to install via the "Install & restart" button in the sidebar.
+// checks for a newer build at boot and notifies the frontend; the same
+// check runs on demand via the `check_for_update` command (settings).
 async fn check_for_update(app: tauri::AppHandle) {
-    let updater = match app.updater() {
-        Ok(updater) => updater,
-        Err(err) => {
-            eprintln!("updater unavailable: {err}");
-            return;
-        }
-    };
-
-    match updater.check().await {
-        Ok(Some(update)) => {
-            let _ = app.emit(
-                "update://available",
-                serde_json::json!({
-                    "version": update.version,
-                    "body": update.body,
-                    "date": update.date.map(|d| d.to_string()),
-                }),
-            );
-        }
-        Ok(None) => {}
-        Err(err) => eprintln!("update check failed: {err}"),
+    if let Err(err) = commands::run_update_check(&app).await {
+        eprintln!("update check failed: {err}");
     }
 }
 
@@ -68,10 +51,11 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // Windows/Linux deliver deep links by spawning a new instance:
-            // forward tymar:// URLs to the running app instead.
+            // forward configured deep-link URLs to the running app instead.
+            let deep_link_prefix = format!("{}://", env::deep_link_scheme());
             let urls: Vec<String> = args
                 .into_iter()
-                .filter(|a| a.starts_with("tymar://"))
+                .filter(|a| a.starts_with(deep_link_prefix.as_str()))
                 .collect();
             if !urls.is_empty() {
                 let _ = app.emit("tymar://deep-link", urls);
@@ -79,14 +63,17 @@ pub fn run() {
             crate::show_window(app);
         }))
         .setup(|app| {
-            // Register the `tymar://` scheme where the OS needs runtime
-            // registration (Windows registry / Linux desktop entry).
+            // Register the configured deep-link scheme where the OS needs runtime
+            // registration. Linux packaged builds use the bundled desktop entry;
+            // Linux dev/AppImage builds register their own handler files.
             // macOS registers schemes via the bundled Info.plist, and the
             // plugin reports UnsupportedPlatform there — never fatal.
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            #[cfg(target_os = "windows")]
             if let Err(e) = app.deep_link().register_all() {
                 eprintln!("deep-link registration failed: {e}");
             }
+            #[cfg(target_os = "linux")]
+            crate::deep_link::register_at_startup(app);
 
             // autostart launches with --hidden: stay in the tray without a
             // window; a normal launch shows the main window immediately
@@ -115,23 +102,19 @@ pub fn run() {
 
             app.manage(AppState::new(conn, app_data_dir));
 
+            // Dev builds carry a `Dev` postfix in the title (the tray uses
+            // the same name) so they read apart from the installed app.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&env::display_name());
+            }
+
             let updater_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 check_for_update(updater_handle).await;
             });
 
-            // Refresh the tray's elapsed readout while a session is open.
-            let tick_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                    let state = tick_handle.state::<AppState>();
-                    let store = timer::load(&state.app_data_dir);
-                    if store.active.is_some() {
-                        tray::rebuild_menu(&tick_handle);
-                    }
-                }
-            });
+            // The tray's timer readout is refreshed by the frontend via
+            // `set_tray_state` (Rust owns no timer state anymore).
 
             // not a template: renders full color with the app icon's own background,
             // rather than a floating transparent glyph
@@ -150,20 +133,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_timer_state,
-            commands::ack_entries,
-            commands::start_timer,
-            commands::take_break,
-            commands::resume_timer,
-            commands::stop_timer,
-            commands::switch_task,
-            commands::attach_open_segment_remote_id,
+            commands::get_legacy_pending,
+            commands::clear_legacy_pending,
+            commands::set_tray_state,
             commands::get_settings,
             commands::set_setting,
             commands::enable_autostart,
             commands::disable_autostart,
             commands::is_autostart_enabled,
             commands::install_update,
+            commands::check_for_update,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

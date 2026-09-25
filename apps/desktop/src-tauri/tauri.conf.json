@@ -49,6 +49,14 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux-main.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "linux-main.desktop"
+      }
+    },
     "publisher": "Tonmoy Deb",
     "category": "public.app-category.developer-tools",
     "shortDescription": "Effortless time tracking for focused work.",

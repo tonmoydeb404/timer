@@ -1,7 +1,7 @@
 # Tymar — Work Progress
 
-Last updated: 2026-09-22. Covers everything from the empty scaffold through
-Phase 5 (dashboard analytics/history/editing).
+Last updated: 2026-09-25. Covers everything from the empty scaffold through
+Phase 6 (cloud-backed cross-device timer).
 
 ## 1. Status snapshot
 
@@ -10,13 +10,14 @@ Phase 5 (dashboard analytics/history/editing).
 | Phase 0 — Appwrite backend | Done, provisioned + verified live |
 | Phase 1 — Foundation + auth | Done (web proven; desktop in final testing) |
 | Phase 2 — Projects & tasks | Done, cross-checked web ↔ desktop |
-| Phase 3 — Core time tracking | Done, unit-tested (10/10) |
-| Phase 4 — Tray experience | Done, needs OS-level check |
+| Phase 3 — Core time tracking | Superseded by Phase 6 |
+| Phase 4 — Tray experience | Superseded by Phase 6 (IPC-driven tray) |
 | UX rounds (sheets, DataState, 420px, Today redesign) | Done |
 | OAuth hardening (deep link → web bridge) | Done, in final user testing |
 | Phase 5 — Dashboard analytics/history/editing | Done, needs live-data check |
+| Phase 6 — Realtime cross-device timer | Done (code), needs live 2-device check |
 
-Working tree holds the Phase 5 implementation; every prior step is committed
+Working tree holds the Phase 6 implementation; every prior step is committed
 on `main`.
 
 ## 2. As-built architecture
@@ -24,21 +25,25 @@ on `main`.
 ```
 Webview (React + Appwrite Web SDK)      Rust process (always alive)
 ┌──────────────────────────────┐        ┌─────────────────────────┐
-│ Auth (session, deep-link)    │        │ timer.rs state machine  │
-│ Projects/tasks reads+writes  │ invoke │ state.json (active +    │
-│ Time-entry uploads           │◄──────►│  pending queue)         │
-│ UI (Today/Tasks/History/     │ events │ Tray menu + 30s tick    │
-│  Settings, dashboard)        │        │ Settings KV (SQLite)    │
+│ Auth (session, deep-link)    │        │ Tray mirror (receives   │
+│ Timer: open-entry reads +    │ invoke │  TrayState pushes)      │
+│   realtime subscription      │◄──────►│ Legacy drain commands   │
+│ Projects/tasks/time-entries  │ events │  (timer-state.json)     │
+│ UI + tray pushes             │        │ Settings KV (SQLite)    │
 └──────────────┬───────────────┘        └─────────────────────────┘
                │ Appwrite SDK (no Appwrite code in Rust)
                ▼
         Appwrite Cloud (sgp) — sole source of truth
 ```
 
-Rules that survived: desktop owns the live timer; elapsed always derives
-from stored timestamps; duration is never stored (derived); Appwrite IDs are
-server-generated; breaks attach to the active task; document/row security
-enforces per-user isolation (no server API key ships in any client).
+Rules that survived: elapsed always derives from stored timestamps; duration
+is never stored (derived); Appwrite IDs are server-generated; breaks attach
+to the active task; document/row security enforces per-user isolation (no
+server API key ships in any client). Phase 6 rules: **the cloud is the only
+source of truth for the running timer** — the open entry (`endedAt` null) is
+the timer; one boot-time fetch + realtime keep every device in sync; writes
+are direct API calls; offline = blocked (no local fallback, no orphans);
+Rust owns no timer state, only renders pushed tray state.
 
 ## 3. Phase log
 
@@ -110,7 +115,39 @@ enforces per-user isolation (no server API key ships in any client).
   commands; Switch opens the window and asks Today for the picker.
 - Needs an OS-level check (menu rendering/tick) — not verifiable headless.
 
+### Phase 6 — Realtime cross-device timer (uncommitted)
+
+Bug that drove it: the live timer lived in `timer-state.json` (per-device),
+so a timer started on one device was invisible on another; the open-entry
+docs the old version created were write-only (never queried back).
+
+- Cloud layer (`lib/db.ts`): `getActiveTimeEntry` (`endedAt` IS NULL, limit
+  1) + `closeTimeEntry`. Start = create open doc; stop/break/resume/switch =
+  close + create — all direct SDK calls; failures leave no local trace
+  (offline start is blocked by design — no orphans, no duplicate timers).
+- Realtime (`lib/realtime.ts`): one `client.subscribe` on
+  `tablesdb.timer.tables.time_entries.rows` filtered by `userId`; events
+  drive the running state on every device (create with null `endedAt` →
+  running; close/delete of the tracked id → idle). `timer-context.tsx` is
+  rewritten to derive everything from this; elapsed is anchored at fetch
+  time (`elapsedMsBase + now - fetchedAt`) so device clock skew can't jump
+  the display. Safety refetch on window focus + 60s tick.
+- Tray (`tray.rs`): Rust no longer owns timer state. New `set_tray_state`
+  command receives `TrayState {running, on_break, title, elapsed_ms}` from
+  the frontend (30s cadence for the readout); Break/Resume/Stop menu items
+  emit `tymar://tray-action` back to the frontend, which performs the API
+  call. The Rust 30s tick loop is gone.
+- Legacy drain: `get_legacy_pending` / `clear_legacy_pending` surface the
+  old version's queued closed segments; the frontend uploads them once
+  (acks only after success, so retries are safe). `timer-state.json`
+  survives only as this drain target; `timer.rs` shrank to serde shapes +
+  load/save/clear (3 unit tests).
+- Entries freshness: `use-time-entries` also subscribes to realtime, so
+  Today/This week cards and the Times list update on any device's stop.
+  Home's Today card is now day-scoped (closed entries + live open elapsed).
+
 ### Phase 5 — Dashboard analytics/history/editing (uncommitted)
+
 - `@packages/domain/src/analytics.ts` (exported from index + package
   exports): `entryDurationMs`, midnight-split `aggregateDayTotals`,
   `totalsForDay`/`sumDayTotals`, `lastNDayKeys`, `aggregateByProject`,
@@ -169,19 +206,24 @@ source cross-checks (cookie name, OAuth/token paths, CORS reflection of
 Needs a human (in order):
 1. Desktop sign-in end-to-end (bundled app receives `tymar://`; dev
    binaries use the paste-the-link fallback on the login screen).
-2. Phase 3 acceptance: start→break→resume→stop, restart mid-session,
-   offline stop → pending → flush.
-3. Phase 4 tray workflow with the window closed.
-4. Phase 5 data review: track real sessions, then check overview totals,
-   history grouping/editing, timezone change regrouping, and desktop
-   History/weekly card against the web dashboard.
+2. Phase 6 acceptance (two devices signed into the same account):
+   start on A → B shows it running within ~a second and keeps counting;
+   stop/break/resume/switch on B → A follows live; B start while A runs is
+   impossible (start button unreachable while an entry is open).
+3. Offline start → error toast, nothing created; offline stop → error,
+   timer keeps running, closes fine once back online.
+4. Tray workflow with the window closed (pushes arrive while hidden).
+5. Upgrade path: run the pre-Phase-6 build with a queued stop, update,
+   confirm the legacy pending segments land in Appwrite once.
 
 ## 6. Remaining work
 
 - Post-MVP backlog (per PRD): global shortcuts, idle detection (opt-in),
-  notifications, multi-desktop, integrations, richer dashboard, cron
-  hard-delete of soft-deleted projects, offline SQLite cache (client
-  UUIDs return there).
+  notifications, integrations, richer dashboard, cron hard-delete of
+  soft-deleted projects, offline SQLite cache (intentionally absent — the
+  timer is online-only by design now), stale open-entry reconciliation UX
+  (a hard device death leaves the entry open; cloud truth = running, fix
+  times manually via the web dashboard).
 - Release-time flags: production desktop builds must bake the deployed
   web URL into `VITE_WEB_URL` (dev default `localhost:3010`); updater
   signing key for bundles (`--no-sign` used for local test bundles).

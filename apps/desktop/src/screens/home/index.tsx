@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
     aggregateDayTotals,
     currentWeekBounds,
+    dayKey,
     formatDuration,
     formatDurationShort,
     type TimeInterval,
@@ -35,13 +36,15 @@ export function HomeScreen() {
   const { projects } = useProjects();
   const { tasks, quickAdd } = useTasks();
   const { entries, timeZone, addManualEntry } = useTimeEntries();
-  const { view, busy, fetchedAt, start, takeBreak, resume, stop, switchTo } =
+  const { view, busy, elapsedMsBase, fetchedAt, start, takeBreak, resume, stop, switchTo } =
     useTimer();
   const [, setTick] = useState(0);
   const [startOpen, setStartOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [weekWorkMs, setWeekWorkMs] = useState(0);
   const [weekBreakMs, setWeekBreakMs] = useState(0);
+  const [todayWorkMs, setTodayWorkMs] = useState(0);
+  const [todayBreakMs, setTodayBreakMs] = useState(0);
 
   const userId = auth?.user?.id ?? null;
   const status = view?.status ?? "IDLE";
@@ -88,13 +91,20 @@ export function HomeScreen() {
     const perDay = aggregateDayTotals(inWeek, timeZone);
     setWeekWorkMs(perDay.reduce((sum, d) => sum + d.workMs, 0));
     setWeekBreakMs(perDay.reduce((sum, d) => sum + d.breakMs, 0));
+    const today = perDay.find((d) => d.day === dayKey(Date.now(), timeZone));
+    setTodayWorkMs(today?.workMs ?? 0);
+    setTodayBreakMs(today?.breakMs ?? 0);
   }, [entries, timeZone]);
 
-  const elapsed = running ? Math.max(0, Date.now() - fetchedAt) : 0;
-  const openKind = view?.segments.find((s) => s.ended_at_ms === null)?.type;
-  const totalMs = (view?.total_ms ?? 0) + elapsed;
-  const workMs = (view?.work_ms ?? 0) + (openKind === "WORK" ? elapsed : 0);
-  const breakMs = (view?.break_ms ?? 0) + (openKind === "BREAK" ? elapsed : 0);
+  // Live elapsed of the open entry, anchored at fetch time (clock-skew safe).
+  const elapsed = running
+    ? Math.max(0, elapsedMsBase + Date.now() - fetchedAt)
+    : 0;
+  const openIsWork = running && view.kind === "WORK";
+  const openIsBreak = running && view.kind === "BREAK";
+  const totalMs = elapsed;
+  const workMs = todayWorkMs + (openIsWork ? elapsed : 0);
+  const breakMs = todayBreakMs + (openIsBreak ? elapsed : 0);
 
   const taskById = useMemo(
     () => new Map(tasks.map((t) => [t.$id, t])),
@@ -317,11 +327,11 @@ export function HomeScreen() {
         submitLabel={running ? "Switch" : "Start"}
         busy={busy}
         onQuickAdd={handleQuickAdd}
-        onSubmit={async ({ projectId, projectTitle, taskId, taskTitle }) => {
+        onSubmit={async ({ projectId, taskId }) => {
           if (running) {
-            await switchTo(taskId, taskTitle, projectId, projectTitle);
+            await switchTo(taskId, projectId);
           } else {
-            await start(taskId, taskTitle, projectId, projectTitle);
+            await start(taskId, projectId);
           }
         }}
       />

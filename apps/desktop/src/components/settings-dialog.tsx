@@ -1,6 +1,7 @@
 import { useModal } from "@/context/modal-context";
 import { api } from "@/lib/api";
 import { brand } from "@/lib/brand";
+import { displayName } from "@/lib/display-name";
 import { Button } from "@packages/ui/components/button";
 import {
   Dialog,
@@ -87,7 +88,7 @@ export function SettingsDialog() {
     try {
       if (checked) {
         await api.enableAutostart();
-        toast.success(`${brand.appName} will launch on system boot.`);
+        toast.success(`${displayName} will launch on system boot.`);
       } else {
         await api.disableAutostart();
         toast.success("Autostart disabled.");
@@ -109,7 +110,7 @@ export function SettingsDialog() {
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Configure {brand.appName} to fit your workflow.
+            Configure {displayName} to fit your workflow.
           </DialogDescription>
         </DialogHeader>
 
@@ -127,7 +128,7 @@ export function SettingsDialog() {
           <SettingsSection title="SYSTEM">
             <ToggleRow
               title="Start at login"
-              description={`Launch ${brand.appName} automatically on system boot.`}
+              description={`Launch ${displayName} automatically on system boot.`}
               checked={autostart}
               onChange={handleAutostartToggle}
             />
@@ -136,7 +137,7 @@ export function SettingsDialog() {
           <SettingsSection title="ABOUT">
             <div className="grid gap-1 rounded-lg border border-border bg-surface p-3 text-[0.78rem] text-muted-foreground">
               <span className="text-ink">
-                {brand.appName} <span className="text-faint">v{brand.version}</span>
+                {displayName} <span className="text-faint">v{brand.version}</span>
               </span>
               <span>{brand.description.short}</span>
               <span className="mt-1">

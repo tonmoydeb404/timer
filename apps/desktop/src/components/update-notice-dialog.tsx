@@ -1,4 +1,5 @@
 import { brand } from "@/lib/brand";
+import { displayName } from "@/lib/display-name";
 import { Button } from "@packages/ui/components/button";
 import { ResponsiveSheet } from "@packages/ui/components/responsive-sheet";
 import { CheckCircle2 } from "lucide-react";
@@ -30,7 +31,7 @@ export function UpdateNoticeDialog({
             <CheckCircle2 size={18} />
           </span>
           <span className="grid gap-0.5 text-left">
-            <span>{brand.appName} is up to date</span>
+            <span>{displayName} is up to date</span>
             <span className="text-sm font-normal text-muted-foreground">
               {previousVersion
                 ? `Updated from v${previousVersion} to v${brand.version}.`
@@ -42,7 +43,7 @@ export function UpdateNoticeDialog({
       footer={<Button onClick={onDismiss}>Got it</Button>}
     >
       <p className="text-[0.82rem] leading-relaxed text-muted-foreground">
-        Thanks for keeping {brand.appName} fresh. This version includes the
+        Thanks for keeping {displayName} fresh. This version includes the
         latest improvements and fixes.
       </p>
     </ResponsiveSheet>

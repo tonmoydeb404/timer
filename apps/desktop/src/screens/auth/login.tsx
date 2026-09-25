@@ -1,5 +1,6 @@
 import { useApp } from "@/context/app-context";
-import { brand } from "@/lib/brand";
+import { displayName } from "@/lib/display-name";
+import { OAUTH_CALLBACK_URL } from "@/lib/appwrite";
 import { Button } from "@packages/ui/components/button";
 import { Input } from "@packages/ui/components/input";
 import { useState } from "react";
@@ -60,11 +61,11 @@ export function LoginScreen() {
       <div className="grid justify-items-center gap-2 text-center">
         <img
           src="/logo.svg"
-          alt={`${brand.appName} logo`}
+          alt={`${displayName} logo`}
           className="size-18"
         />
         <h1 className="text-xl font-[760] text-ink">
-          Welcome to {brand.appName}
+          Welcome to {displayName}
         </h1>
         <p className="max-w-xs text-[0.82rem] text-muted-foreground">
           {expired
@@ -140,7 +141,7 @@ export function LoginScreen() {
                 void handlePasteLink();
               }
             }}
-            placeholder="tymar://auth?userId=…&secret=…"
+            placeholder={`${OAUTH_CALLBACK_URL}?userId=…&secret=…`}
             autoComplete="off"
             spellCheck={false}
             aria-label="Sign-in link"

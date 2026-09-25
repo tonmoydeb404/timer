@@ -26,7 +26,7 @@ const ownerPermissions = (userId: string) => [
   Permission.delete(Role.user(userId)),
 ];
 
-type Doc = Models.Document & Record<string, unknown>;
+export type Doc = Models.Document & Record<string, unknown>;
 
 function str(value: unknown): string | null {
   return typeof value === "string" ? value : null;
@@ -222,7 +222,40 @@ export async function getProfile(userId: string): Promise<Profile | null> {
   return doc ? toProfile(doc) : null;
 }
 
-/** Recent closed entries, newest first (history + weekly totals). */
+/** The currently running entry (endedAt is null while a timer is open),
+ * or null when nothing is running — for this user, on any device. */
+export async function getActiveTimeEntry(
+  userId: string,
+): Promise<TimeEntry | null> {
+  const res = await requireDatabases().listDocuments(
+    DB,
+    COLLECTIONS.timeEntries,
+    [
+      Query.equal("userId", userId),
+      Query.isNull("endedAt"),
+      Query.orderDesc("startedAt"),
+      Query.limit(1),
+    ],
+  );
+  const doc = res.documents[0] as unknown as Doc | undefined;
+  return doc ? toTimeEntry(doc) : null;
+}
+
+/** Closes an open entry (timer stop / break / switch). */
+export async function closeTimeEntry(
+  entryId: string,
+  endedAtIso: string,
+): Promise<TimeEntry> {
+  const doc = (await requireDatabases().updateDocument(
+    DB,
+    COLLECTIONS.timeEntries,
+    entryId,
+    { endedAt: endedAtIso },
+  )) as unknown as Doc;
+  return toTimeEntry(doc);
+}
+
+/** Recent entries, newest first (history + weekly totals). */
 export async function listTimeEntries(
   userId: string,
   limit = 200,
