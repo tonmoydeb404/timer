@@ -70,7 +70,7 @@ export default function App() {
             <HashRouter>
               <AppRoutes />
             </HashRouter>
-            <Toaster position="bottom-right" />
+            <Toaster position="top-right" />
           </ModalProvider>
         </TimerProvider>
       </DbProvider>
