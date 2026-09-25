@@ -1,6 +1,5 @@
 import type { Project } from "@packages/domain/index";
 import { Button } from "@packages/ui/components/button";
-import { Card, CardContent } from "@packages/ui/components/card";
 import { DataTable } from "@packages/ui/components/data-table";
 import { Input } from "@packages/ui/components/input";
 import { PaginationControl } from "@packages/ui/components/pagination-control";
@@ -85,26 +84,22 @@ export const ProjectListSection = forwardRef<ProjectListSectionHandle, object>(
           </div>
         </div>
 
-        <Card>
-          <CardContent>
-            <DataTable
-              columns={columns}
-              data={projects}
-              loading={loading}
-              isFetching={isFetching}
-              error={error}
-              onRetry={() => void reload()}
-              emptyTitle={
-                total === 0 ? "No projects yet" : "No matching projects"
-              }
-              emptyHint={
-                total === 0
-                  ? "Create the first one to get started."
-                  : "Try a different search or filter."
-              }
-            />
-          </CardContent>
-        </Card>
+        <DataTable
+          columns={columns}
+          data={projects}
+          loading={loading}
+          isFetching={isFetching}
+          error={error}
+          onRetry={() => void reload()}
+          emptyTitle={
+            total === 0 ? "No projects yet" : "No matching projects"
+          }
+          emptyHint={
+            total === 0
+              ? "Create the first one to get started."
+              : "Try a different search or filter."
+          }
+        />
 
         <PaginationControl
           page={page}

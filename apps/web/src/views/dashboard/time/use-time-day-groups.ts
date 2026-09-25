@@ -1,22 +1,38 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
-import { getProfile, queryTimeEntryDays } from "@/lib/db";
+import { getProfile, getTask, queryTimeEntriesByRange } from "@/lib/db";
 import { useAsyncAction } from "@/lib/use-async-action";
 import { useQueryParams } from "@/lib/use-query-params";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { defaultRange } from "./lib/date-range";
+import type { Task, TimeEntry } from "@packages/domain/index";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { dayAfter, defaultRange } from "./lib/date-range";
 import type { EntryTypeFilter } from "./types";
 
-const PAGE_SIZE = 8;
+/** Fixed entry budget per table page — date separators are free rows. */
+const ROWS_PER_PAGE = 20;
 
 function isEntryTypeFilter(value: string): value is EntryTypeFilter {
   return value === "ALL" || value === "WORK" || value === "BREAK";
 }
 
+export type TimeGroupSummary = {
+  day: string;
+  entries: TimeEntry[];
+  workMs: number;
+  breakMs: number;
+};
+
+/** One visible entry row paired with its full-day group (for separators). */
+export type VisibleTimeRow = {
+  entry: TimeEntry;
+  group: TimeGroupSummary;
+};
+
 /**
- * Top-level state for the time list: filters, pagination, and the list of
- * distinct day keys to render — each day group then fetches its own entries.
+ * Top-level state for the grouped time table: one range query for all
+ * entries in the selected date range, grouped by start-day, with entry-row
+ * pagination in memory. A date split across pages repeats its separator row.
  * Every filter is read from/written to URL search params so the list stays
  * shareable and survives refreshes.
  */
@@ -24,8 +40,12 @@ export function useTimeDayGroups() {
   const { user } = useAuth();
   const { get, set } = useQueryParams();
   const [timeZone, setTimeZone] = useState("UTC");
-  const [days, setDays] = useState<string[]>([]);
-  const [total, setTotal] = useState(0);
+  const [groups, setGroups] = useState<TimeGroupSummary[]>([]);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [taskById, setTaskById] = useState<Record<string, Task | null>>({});
+  const fetchedTaskIds = useRef<Set<string>>(new Set());
   const [refreshSignal, setRefreshSignal] = useState(0);
 
   const fallbackRange = useMemo(defaultRange, []);
@@ -87,50 +107,87 @@ export function useTimeDayGroups() {
 
   const {
     run: reload,
-    isLoading: loading,
+    isLoading: isFetching,
     error,
   } = useAsyncAction(
     useCallback(async () => {
       if (!user) return;
-      const { days: rows, total: count } = await queryTimeEntryDays(
-        user.$id,
-        timeZone,
-        {
+      const { groups: rows, totalEntries: count, truncated: hitCap } =
+        await queryTimeEntriesByRange(user.$id, timeZone, {
           type: typeFilter,
           taskId: taskFilter || undefined,
           projectId: taskFilter ? undefined : projectFilter || undefined,
           from: range.from ? `${range.from}T00:00:00.000Z` : undefined,
-          to: range.to
-            ? new Date(
-                new Date(`${range.to}T00:00:00.000Z`).getTime() +
-                  24 * 3600 * 1000,
-              ).toISOString()
-            : undefined,
-          limit: PAGE_SIZE,
-          offset: (page - 1) * PAGE_SIZE,
-        },
-      );
-      setDays(rows);
-      setTotal(count);
-    }, [user, timeZone, typeFilter, taskFilter, projectFilter, range, page]),
+          to: range.to ? dayAfter(range.to) : undefined,
+        });
+      setGroups(rows);
+      setTotalEntries(count);
+      setTruncated(hitCap);
+      setHasLoadedOnce(true);
+    }, [user, timeZone, typeFilter, taskFilter, projectFilter, range]),
   );
+
+  // Only the very first fetch should show the full skeleton — later refetches
+  // keep existing rows with a top bar loader (same as useTasksData).
 
   useEffect(() => {
     void reload();
   }, [reload, refreshSignal]);
 
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const loading = isFetching && !hasLoadedOnce;
+
+  const pageCount = Math.max(1, Math.ceil(totalEntries / ROWS_PER_PAGE));
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount, setPage]);
+
+  // Visible entry rows for the current page, each paired with its full-day
+  // group (separators show full-day totals even when a date splits pages).
+  const visible = useMemo<VisibleTimeRow[]>(() => {
+    const start = (page - 1) * ROWS_PER_PAGE;
+    return groups
+      .flatMap((group) => group.entries.map((entry) => ({ entry, group })))
+      .slice(start, start + ROWS_PER_PAGE);
+  }, [groups, page]);
+
+  // Task-name lookup for entries on the current page; fetched ids are
+  // remembered so page turns only fetch uncached tasks.
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        visible.flatMap((v) => (v.entry.taskId ? [v.entry.taskId] : [])),
+      ),
+    );
+    const missing = ids.filter((id) => !fetchedTaskIds.current.has(id));
+    if (missing.length === 0) return;
+    missing.forEach((id) => fetchedTaskIds.current.add(id));
+    let cancelled = false;
+    void (async () => {
+      const tasks = await Promise.all(missing.map((id) => getTask(id)));
+      if (cancelled) return;
+      setTaskById((prev) => {
+        const next = { ...prev };
+        missing.forEach((id, i) => {
+          next[id] = tasks[i] ?? null;
+        });
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
 
   const notifyChanged = useCallback(() => setRefreshSignal((n) => n + 1), []);
 
   return useMemo(
     () => ({
-      days,
-      total,
+      visible,
+      taskById,
+      totalEntries,
+      truncated,
       loading,
+      isFetching,
       error,
       timeZone,
       typeFilter,
@@ -149,9 +206,12 @@ export function useTimeDayGroups() {
       notifyChanged,
     }),
     [
-      days,
-      total,
+      visible,
+      taskById,
+      totalEntries,
+      truncated,
       loading,
+      isFetching,
       error,
       timeZone,
       typeFilter,
