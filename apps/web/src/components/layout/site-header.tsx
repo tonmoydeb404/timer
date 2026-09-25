@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { sitePaths } from "@/config/paths-config";
+import { appPaths, sitePaths } from "@/config/paths-config";
 import { APP_NAME } from "@/content/homepage";
 import { Button } from "@packages/ui/components/button";
 import Image from "next/image";
@@ -47,14 +47,17 @@ export function SiteHeader() {
               </Link>
             ),
           )}
-          <Button
-            nativeButton={false}
-            render={
-              <Link href={sitePaths.download} target="_blank" rel="noreferrer">
-                Download
-              </Link>
-            }
-          />
+          <div className="flex items-center gap-2">
+            <Button
+              nativeButton={false}
+              render={<Link href={sitePaths.download}>Download</Link>}
+              variant={"secondary"}
+            />
+            <Button
+              nativeButton={false}
+              render={<Link href={appPaths.login}>Login</Link>}
+            />
+          </div>
         </nav>
 
         <SiteMobileMenu />

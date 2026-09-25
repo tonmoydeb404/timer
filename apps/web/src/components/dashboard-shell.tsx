@@ -1,28 +1,23 @@
 "use client";
 
-import { ThemeToggle } from "@/components/theme-toggle";
 import { appPaths } from "@/config/paths-config";
 import { APP_NAME } from "@/content/homepage";
-import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
-import { Button } from "@packages/ui/components/button";
 import { Separator } from "@packages/ui/components/separator";
-import { LogOut } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserMenu } from "./user-menu";
 
 const navItems = [
   { label: "Overview", href: appPaths.dashboard },
   { label: "Projects", href: appPaths.projects },
   { label: "Tasks", href: appPaths.tasks },
   { label: "Time", href: appPaths.time },
-  { label: "Settings", href: appPaths.settings },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, loading, signOut } = useAuth();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -65,16 +60,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-1">
-            {!loading && user && (
-              <span className="hidden max-w-48 truncate text-sm text-muted-foreground sm:block">
-                {user.name || user.email}
-              </span>
-            )}
-            <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut size={14} />
-              Sign out
-            </Button>
+            <UserMenu />
           </div>
         </div>
         <div className="container flex gap-1 overflow-x-auto pb-2 md:hidden">

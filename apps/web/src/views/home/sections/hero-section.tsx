@@ -1,7 +1,7 @@
-import { ArrowDown, ExternalLink } from "lucide-react";
+import { LucideArrowRight, LucideDownload } from "lucide-react";
 
 import { AppScreenshot } from "@/components/app-screenshot";
-import { sitePaths } from "@/config/paths-config";
+import { appPaths, sitePaths } from "@/config/paths-config";
 import { heroScreenshot } from "@/content/homepage";
 import { Badge } from "@packages/ui/components/badge";
 import { Button } from "@packages/ui/components/button";
@@ -18,16 +18,15 @@ export function HeroSection() {
           Time tracking that lives in your tray
         </h1>
         <p className="max-w-lg text-lg leading-relaxed text-muted-foreground text-pretty">
-          Start a work session with one click, take breaks without losing
-          your thread, and see exactly where the day went — in one quiet
-          desktop app.
+          Start a work session with one click, take breaks without losing your
+          thread, and see exactly where the day went — in one quiet desktop app.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button
             render={
-              <Link href={sitePaths.download} target="_blank" rel="noreferrer">
-                Download Now
-                <ExternalLink data-icon="inline-end" aria-hidden="true" />
+              <Link href={appPaths.login}>
+                Get Started
+                <LucideArrowRight data-icon="inline-end" aria-hidden="true" />
               </Link>
             }
             nativeButton={false}
@@ -36,9 +35,9 @@ export function HeroSection() {
 
           <Button
             render={
-              <Link href="#features">
-                Explore features
-                <ArrowDown data-icon="inline-end" aria-hidden="true" />
+              <Link href={sitePaths.download}>
+                Download Now
+                <LucideDownload data-icon="inline-end" aria-hidden="true" />
               </Link>
             }
             variant={"outline"}
@@ -49,9 +48,9 @@ export function HeroSection() {
           className="flex flex-wrap gap-2 pt-1"
           aria-label="Product availability"
         >
-          <Badge variant="secondary">macOS</Badge>
-          <Badge variant="secondary">Windows</Badge>
-          <Badge variant="secondary">Linux</Badge>
+          <Badge variant="outline">macOS</Badge>
+          <Badge variant="outline">Windows</Badge>
+          <Badge variant="outline">Linux</Badge>
           <Badge variant="outline">Free and open source</Badge>
         </div>
       </div>

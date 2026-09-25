@@ -64,7 +64,7 @@ export function DataTable<TData extends RowData>({
   const headerGroups = table.getHeaderGroups();
 
   return (
-    <div className="relative">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card">
       {!loading && isFetching && (
         <div className="absolute inset-x-0 -top-px z-10 h-0.5 overflow-hidden rounded-full bg-primary/20">
           <div className="h-full w-1/3 animate-[data-table-loader_1s_ease-in-out_infinite] rounded-full bg-primary" />

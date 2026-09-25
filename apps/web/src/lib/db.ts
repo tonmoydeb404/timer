@@ -2,8 +2,8 @@ import {
   aggregateDayTotals,
   APPWRITE_DATABASE_ID,
   COLLECTIONS,
-  dayKey,
   entryDurationMs,
+  groupEntriesByStartDay,
   type DayTotal,
   type EntryType,
   type Profile,
@@ -550,73 +550,70 @@ export async function queryTimeEntries(
   };
 }
 
-export type TimeEntryDayQuery = {
-  type?: EntryType | "ALL";
-  taskId?: string;
-  projectId?: string;
-  from?: string;
-  to?: string;
-  limit?: number;
-  offset?: number;
+export type TimeRangeGroup = {
+  /** "YYYY-MM-DD" day key in the caller's timeZone. */
+  day: string;
+  /** Newest-first entries whose start falls on this day. */
+  entries: TimeEntry[];
+  workMs: number;
+  breakMs: number;
+  entryCount: number;
 };
 
 /**
- * Lightweight day-key listing for the time list's top-level pagination —
- * reads only `startedAt` (via `Query.select`). Actual entries for a given
- * day are fetched separately, per day group, via `queryTimeEntries`.
+ * Single range query for the grouped time table — pages through ALL entries
+ * in [from, to) via `queryTimeEntries` (Appwrite has no aggregate queries),
+ * then groups by start-day client-side. The chart (`getDayTotals`) stays a
+ * separate, independent call.
  */
-export async function queryTimeEntryDays(
+export async function queryTimeEntriesByRange(
   userId: string,
   timeZone: string,
-  query: TimeEntryDayQuery = {},
-): Promise<{ days: string[]; total: number }> {
-  const {
-    type = "ALL",
-    taskId,
-    projectId,
-    from,
-    to,
-    limit = 8,
-    offset = 0,
-  } = query;
+  query: Omit<TimeEntryQuery, "limit" | "offset"> = {},
+  opts: { pageSize?: number; maxEntries?: number } = {},
+): Promise<{
+  groups: TimeRangeGroup[];
+  totalEntries: number;
+  truncated: boolean;
+}> {
+  const { pageSize = 100, maxEntries = 2000 } = opts;
 
-  let taskIdFilter: string | string[] | undefined = taskId;
-  if (!taskIdFilter && projectId) {
-    const { tasks } = await queryTasks(userId, { projectId, limit: 200 });
-    if (tasks.length === 0) return { days: [], total: 0 };
-    taskIdFilter = tasks.map((t) => t.$id);
+  const all: TimeEntry[] = [];
+  let offset = 0;
+  let total = 0;
+  for (;;) {
+    const { entries, total: t } = await queryTimeEntries(userId, {
+      ...query,
+      limit: pageSize,
+      offset,
+    });
+    total = t;
+    all.push(...entries);
+    offset += pageSize;
+    if (
+      entries.length < pageSize ||
+      offset >= total ||
+      all.length >= maxEntries
+    )
+      break;
   }
+  const truncated = all.length >= maxEntries && offset < total;
+  const rows = truncated ? all.slice(0, maxEntries) : all;
 
-  const queries = [
-    byUser(userId),
-    Query.select(["startedAt"]),
-    Query.orderDesc("startedAt"),
-    Query.limit(limit),
-    Query.offset(offset),
-  ];
-  if (type !== "ALL") queries.push(Query.equal("type", type));
-  if (taskIdFilter) queries.push(Query.equal("taskId", taskIdFilter));
-  if (from) queries.push(Query.greaterThanEqual("startedAt", from));
-  if (to) queries.push(Query.lessThan("startedAt", to));
-
-  const res = await requireDatabases().listDocuments(
-    DB,
-    COLLECTIONS.timeEntries,
-    queries,
+  const groups = groupEntriesByStartDay(rows, timeZone).map(
+    ({ day, entries }) => {
+      let workMs = 0;
+      let breakMs = 0;
+      for (const e of entries) {
+        const ms = entryDurationMs(e.startedAt, e.endedAt);
+        if (e.type === "BREAK") breakMs += ms;
+        else workMs += ms;
+      }
+      return { day, entries, workMs, breakMs, entryCount: entries.length };
+    },
   );
-  const docs = res.documents as unknown as Doc[];
-  const days: string[] = [];
-  const seen = new Set<string>();
-  for (const doc of docs) {
-    const ms = new Date(String(doc.startedAt ?? "")).getTime();
-    if (!Number.isFinite(ms)) continue;
-    const day = dayKey(ms, timeZone);
-    if (!seen.has(day)) {
-      seen.add(day);
-      days.push(day);
-    }
-  }
-  return { days, total: res.total };
+
+  return { groups, totalEntries: total, truncated };
 }
 
 export type TimeStats = {

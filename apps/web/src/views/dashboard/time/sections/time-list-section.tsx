@@ -4,16 +4,14 @@ import { ProjectSelect } from "@/components/selectors/project-select";
 import { TaskSelect } from "@/components/selectors/task-select";
 import { useProjects } from "@/contexts/app/app-context";
 import type { TimeEntry } from "@packages/domain/index";
-import { Accordion } from "@packages/ui/components/accordion";
 import { Button } from "@packages/ui/components/button";
-import { DataState } from "@packages/ui/components/data-state";
 import { PaginationControl } from "@packages/ui/components/pagination-control";
 import { forwardRef, useCallback, useImperativeHandle, useState } from "react";
 import type { EntryTypeFilter } from "../types";
 import type { useTimeDayGroups } from "../use-time-day-groups";
 import { CreateTimeEntryModal } from "./create-time-entry-modal";
 import { DeleteTimeEntryModal } from "./delete-time-entry-modal";
-import { TimeDayGroup } from "./time-day-group";
+import { TimeGroupedTable } from "./time-grouped-table";
 import { UpdateTimeEntryModal } from "./update-time-entry-modal";
 
 const TYPE_FILTERS: { value: EntryTypeFilter; label: string }[] = [
@@ -31,9 +29,12 @@ type Props = ReturnType<typeof useTimeDayGroups>;
 export const TimeListSection = forwardRef<TimeListSectionHandle, Props>(
   function TimeListSection(
     {
-      days,
-      total,
+      visible,
+      taskById,
+      totalEntries,
+      truncated,
       loading,
+      isFetching,
       error,
       timeZone,
       typeFilter,
@@ -46,7 +47,6 @@ export const TimeListSection = forwardRef<TimeListSectionHandle, Props>(
       setPage,
       pageCount,
       reload,
-      refreshSignal,
       notifyChanged,
     },
     ref,
@@ -99,39 +99,20 @@ export const TimeListSection = forwardRef<TimeListSectionHandle, Props>(
           </div>
         </div>
 
-        <DataState
+        <TimeGroupedTable
+          visible={visible}
+          totalEntries={totalEntries}
+          timeZone={timeZone}
+          taskById={taskById}
+          projectName={projectName}
+          onEdit={setEditing}
+          onDelete={setDeleting}
           loading={loading}
+          isFetching={isFetching}
           error={error}
-          data={days}
           onRetry={() => void reload()}
-          emptyTitle={
-            total === 0 ? "No time tracked yet" : "No matching entries"
-          }
-          emptyHint={
-            total === 0
-              ? "Start the timer in the desktop app — sessions sync here for review."
-              : "Try a different task, project, type, or date range."
-          }
-        >
-          {(dayKeys) => (
-            <Accordion key={page} className="grid gap-2">
-              {dayKeys.map((day) => (
-                <TimeDayGroup
-                  key={day}
-                  day={day}
-                  timeZone={timeZone}
-                  typeFilter={typeFilter}
-                  taskFilter={taskFilter}
-                  projectFilter={projectFilter}
-                  projectName={projectName}
-                  onEdit={setEditing}
-                  onDelete={setDeleting}
-                  refreshSignal={refreshSignal}
-                />
-              ))}
-            </Accordion>
-          )}
-        </DataState>
+          truncated={truncated}
+        />
 
         <PaginationControl
           page={page}

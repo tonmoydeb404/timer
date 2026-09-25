@@ -15,7 +15,7 @@ breaks without losing your thread, and let Tymar keep the record.
 ## Features
 
 - **One-click tracking** — start, stop, switch, and take breaks from the tray
-  menu; a compact always-on-top window keeps the session visible
+  menu; a compact window keeps the session visible
 - **Projects and tasks** — organize entries by project and task, with quick
   search and a command palette (⌘/Ctrl K)
 - **Local-first** — session state and settings live on your device in SQLite;
